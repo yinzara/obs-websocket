@@ -71,6 +71,10 @@ WSRequestHandler::WSRequestHandler(QWebSocket *client) :
 	messageMap["GetCurrentProfile"] = WSRequestHandler::HandleGetCurrentProfile;
 	messageMap["ListProfiles"] = WSRequestHandler::HandleListProfiles;
 
+	messageMap["ListStreamingServices"] = WSRequestHandler::HandleListStreamingServices;
+	messageMap["GetRTMPSettings"] = WSRequestHandler::HandleGetRTMPSettings;
+	messageMap["SetRTMPSettings"] = WSRequestHandler::HandleSetRTMPSettings;
+
 	authNotRequired.insert("GetVersion");
 	authNotRequired.insert("GetAuthRequired");
 	authNotRequired.insert("Authenticate");
@@ -744,6 +748,64 @@ void WSRequestHandler::HandleListProfiles(WSRequestHandler *owner)
 
 	obs_data_release(response);
 	obs_data_array_release(profiles);
+}
+
+void WSRequestHandler::HandleListStreamingServices(WSRequestHandler *owner) {
+	obs_service_t* svc = obs_service_create("rtmp_common", "dummy_service", nullptr, nullptr);
+	obs_properties_t* svc_props = obs_service_properties(svc);
+	obs_property_t* services = obs_properties_get(svc_props, "service");
+	obs_property_t* servers = obs_properties_get(svc_props, "server");
+
+	obs_data_t *response = obs_data_create();
+	
+	// Loop over every service
+	obs_data_array_t *svc_list = obs_data_array_create();
+	size_t svc_count = obs_property_list_item_count(services);
+
+	for (int i = 0; i < svc_count; i++) {
+		const char* svc_name = obs_property_list_item_string(services, i);
+
+		obs_data_t* selected_service = obs_data_create();
+		obs_data_set_string(selected_service, "service", svc_name);
+		obs_property_modified(services, selected_service);
+		obs_data_release(selected_service);
+
+		obs_data_array_t *svc_servers = obs_data_array_create();
+		size_t srv_count = obs_property_list_item_count(servers);
+		for (int y = 0; y < srv_count; y++) {
+			obs_data_t* srv = obs_data_create();
+			obs_data_set_string(srv, "srv-name", obs_property_list_item_string(servers, y));
+
+			obs_data_array_push_back(svc_servers, srv);
+			obs_data_release(srv);
+		}
+
+		obs_data_t *item = obs_data_create();
+		obs_data_set_string(item, "service-name", svc_name);
+		obs_data_set_array(item, "service-servers", svc_servers);
+
+		obs_data_array_push_back(svc_list, item);
+		
+		obs_data_release(item);
+		obs_data_array_release(svc_servers);
+	}
+
+	obs_data_set_array(response, "services", svc_list);
+
+	owner->SendOKResponse(response);
+
+	obs_data_array_release(svc_list);
+	obs_data_release(response);
+
+	obs_service_release(svc);
+}
+
+void WSRequestHandler::HandleGetRTMPSettings(WSRequestHandler *owner) {
+
+}
+
+void WSRequestHandler::HandleSetRTMPSettings(WSRequestHandler *owner) {
+
 }
 
 void WSRequestHandler::ErrNotImplemented(WSRequestHandler *owner)

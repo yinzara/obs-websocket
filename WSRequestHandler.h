@@ -87,6 +87,10 @@ class WSRequestHandler : public QObject
 
 		static void HandleSetTransitionDuration(WSRequestHandler *owner);
 		static void HandleGetTransitionDuration(WSRequestHandler *owner);
+
+		static void HandleListStreamingServices(WSRequestHandler *owner);
+		static void HandleGetRTMPSettings(WSRequestHandler *owner);
+		static void HandleSetRTMPSettings(WSRequestHandler *owner);
 };
 
 #endif // WSPROTOCOL_H
