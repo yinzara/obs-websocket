@@ -42,9 +42,6 @@ class Utils
 		static int GetTransitionDuration();
 		static void SetTransitionDuration(int ms);
 
-		static obs_service_t* GetStreamingService();
-		static void SetStreamingService(obs_service_t *service);
-
 		static const char* OBSVersionString();
 };
 

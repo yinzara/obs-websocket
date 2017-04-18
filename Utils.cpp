@@ -19,7 +19,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "Utils.h"
 #include "obs-websocket.h"
 #include <obs-frontend-api.h>
-#include <../UI/window-basic-main.hpp>
 #include <QMainWindow>
 #include <QSpinBox>
 
@@ -237,16 +236,6 @@ void Utils::SetTransitionDuration(int ms)
 	{
 		control->setValue(ms);
 	}
-}
-
-obs_service_t* Utils::GetStreamingService() {
-	OBSBasic* main = (OBSBasic*)obs_frontend_get_main_window();
-	return main->GetService();
-}
-
-void Utils::SetStreamingService(obs_service_t* service) {
-	OBSBasic* main = (OBSBasic*)obs_frontend_get_main_window();
-	main->SetService(service);
 }
 
 const char* Utils::OBSVersionString() {
