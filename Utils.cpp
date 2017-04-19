@@ -238,7 +238,8 @@ void Utils::SetTransitionDuration(int ms)
 	}
 }
 
-const char* Utils::OBSVersionString() {
+const char* Utils::OBSVersionString()
+{
 	uint32_t version = obs_get_version();
 
 	uint8_t major, minor, patch;
