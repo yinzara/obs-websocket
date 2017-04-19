@@ -68,6 +68,7 @@ The protocol in general is based on the OBS Remote protocol created by Bill Hami
     - ["SetCurrentProfile"](#setcurrentprofile)
     - ["GetCurrentProfile"](#getcurrentprofile)
     - ["ListProfiles"](#listprofiles)
+    - ["ListStreamingServices"](#liststreamingservices)
 * [Authentication](#authentication)
 
 ## Events
@@ -355,9 +356,27 @@ __Response__ : always OK. No additional fields.
 #### "StartStreaming"
 Start streaming.
 
-__Request fields__ : none  
+__Request fields__ :  
+- **"with-settings"** (object, optional) : if specified, tells OBS to stream using these RTMP settings.
+
 __Response__ : always OK. No additional fields.  
 *New in OBS Studio*
+
+An object passed as `with-settings` in a request must have the following fields :  
+- **"type"** (string) : type of RTMP settings. Must be "rtmp_common" (simple RTMP configuration) or "rtmp_custom" (custom RTMP configuration)
+- **"settings"** (object) : object describing the stream settings. Specific to settings type.
+
+Fields for `settings` if type is "rtmp_common" :  
+- **"service"** (string) : Streaming service name. Must be within the values listed by ["ListStreamingServices"](#liststreamingservices)
+- **"server"** (string) : One of the streaming of the specified service. Must be within the values listed by ["ListStreamingServices"](#liststreamingservices) for that service
+- **"key"** (string) : stream key
+
+Fields for `settings` if type is "rtmp_custom" : 
+- **"server"** (string) : RTMP server hostname/IP address
+- **"key"** (string) : Stream key
+- **"use_auth"** (bool) : Tells OBS to authenticate to the RTMP server with the username and password provided in the settings
+- **"username"** (string) : Username for RTMP authentication (if required)
+- **"password"** (string) : Password for RTMP authentication (if required)
 
 ---
 
@@ -609,8 +628,25 @@ Get a list of available profiles.
 
 __Request fields__ : none
 
-__Response__ : OK with the additional fields :
+__Response__ : OK with these additional fields :
 - **"profiles"** (array of objects) : names of available profiles
+
+---
+
+#### "ListStreamingServices"
+Get a list of streaming services known by OBS along with their ingest servers.
+
+__Request fields__ : none  
+
+__Response : OK with these additional fields :  
+- **"services"** (array of objects) : list of streaming services
+
+An object contained in the `services` array has the following fields :  
+- **"name"** (string) : name of the streaming service
+- **"servers"** (array of objects) : list of ingest servers
+
+An object contained in `servers` array has the following fields :  
+- **"url"** (string) : RTMP server url
 
 ---
 
