@@ -351,33 +351,30 @@ void WSRequestHandler::HandleStartStopRecording(WSRequestHandler *owner)
 
 void WSRequestHandler::HandleStartStreaming(WSRequestHandler *owner)
 {
-	obs_data_t* withSettings = obs_data_get_obj(owner->_requestData, "with-settings");
-
 	if (obs_frontend_streaming_active() == false)
 		obs_frontend_streaming_start();
 
-	if (withSettings)
+	if (obs_data_has_user_value(owner->_requestData, "with-settings"))
 	{
-		const char* service_type = obs_data_get_string(withSettings, "type");
-		obs_data_t* service_settings = obs_data_get_obj(withSettings, "settings");
-
-		if (!service_type || !service_settings)
-		{
-			owner->SendErrorResponse("invalid request parameters");
-			obs_data_release(withSettings);
-			return;
-		}
-
+		obs_data_t* withSettings = obs_data_get_obj(owner->_requestData, "with-settings");
 		obs_output_t* output = obs_frontend_get_streaming_output();
-		obs_service_t* current_service = obs_output_get_service(output);
 
-		obs_service_t* new_service = obs_service_create(service_type, "default_service", service_settings, nullptr);
-		
-		// If the plugin is quick enough, the service is changed even before libobs fetched RTMP settings from the set service
-		obs_output_set_service(output, new_service);
+		if (obs_data_has_user_value(withSettings, "type") 
+			|| obs_data_has_user_value(withSettings, "settings"))
+		{
+			const char* service_type = obs_data_get_string(withSettings, "type");
+			obs_data_t* service_settings = obs_data_get_obj(withSettings, "settings");
+
+			obs_service_t* current_service = obs_output_get_service(output);
+
+			obs_service_t* new_service = obs_service_create(service_type, "default_service", service_settings, nullptr);
+
+			// If the plugin is quick enough, the service is changed even before libobs fetched RTMP settings from the set service
+			obs_output_set_service(output, new_service);
+		}
 		
 		//obs_service_release(current_service);
-		//obs_output_release(output);
+		obs_output_release(output);
 		obs_data_release(withSettings);
 	}
 
