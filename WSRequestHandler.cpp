@@ -72,8 +72,7 @@ WSRequestHandler::WSRequestHandler(QWebSocket *client) :
 	messageMap["ListProfiles"] = WSRequestHandler::HandleListProfiles;
 
 	messageMap["ListStreamingServices"] = WSRequestHandler::HandleListStreamingServices;
-	messageMap["GetRTMPSettings"] = WSRequestHandler::HandleGetRTMPSettings;
-	messageMap["SetRTMPSettings"] = WSRequestHandler::HandleSetRTMPSettings;
+	//messageMap["GetCurrentRTMPSettings"] = WSRequestHandler::HandleGetCurrentRTMPSettings; // Insecure
 
 	authNotRequired.insert("GetVersion");
 	authNotRequired.insert("GetAuthRequired");
@@ -352,8 +351,35 @@ void WSRequestHandler::HandleStartStopRecording(WSRequestHandler *owner)
 
 void WSRequestHandler::HandleStartStreaming(WSRequestHandler *owner)
 {
+	obs_data_t* withSettings = obs_data_get_obj(owner->_requestData, "with-settings");
+
 	if (obs_frontend_streaming_active() == false)
 		obs_frontend_streaming_start();
+
+	if (withSettings)
+	{
+		const char* service_type = obs_data_get_string(withSettings, "type");
+		obs_data_t* service_settings = obs_data_get_obj(withSettings, "settings");
+
+		if (!service_type || !service_settings)
+		{
+			owner->SendErrorResponse("invalid request parameters");
+			obs_data_release(withSettings);
+			return;
+		}
+
+		obs_output_t* output = obs_frontend_get_streaming_output();
+		obs_service_t* current_service = obs_output_get_service(output);
+
+		obs_service_t* new_service = obs_service_create(service_type, "default_service", service_settings, nullptr);
+		
+		// If the plugin is quick enough, the service is changed even before libobs fetched RTMP settings from the set service
+		obs_output_set_service(output, new_service);
+		
+		//obs_service_release(current_service);
+		//obs_output_release(output);
+		obs_data_release(withSettings);
+	}
 
 	owner->SendOKResponse();
 }
@@ -781,7 +807,7 @@ void WSRequestHandler::HandleListStreamingServices(WSRequestHandler *owner)
 		for (int y = 0; y < srv_count; y++)
 		{
 			obs_data_t* srv = obs_data_create();
-			obs_data_set_string(srv, "srv-name", obs_property_list_item_string(servers, y));
+			obs_data_set_string(srv, "url", obs_property_list_item_string(servers, y));
 
 			obs_data_array_push_back(svc_servers, srv);
 			obs_data_release(srv);
@@ -789,8 +815,8 @@ void WSRequestHandler::HandleListStreamingServices(WSRequestHandler *owner)
 
 		// Create the list item and push it at the end of the array
 		obs_data_t *item = obs_data_create();
-		obs_data_set_string(item, "service-name", svc_name);
-		obs_data_set_array(item, "service-servers", svc_servers);
+		obs_data_set_string(item, "name", svc_name);
+		obs_data_set_array(item, "servers", svc_servers);
 
 		obs_data_array_push_back(svc_list, item);
 		
@@ -808,27 +834,36 @@ void WSRequestHandler::HandleListStreamingServices(WSRequestHandler *owner)
 	obs_service_release(svc);
 }
 
-void WSRequestHandler::HandleGetRTMPSettings(WSRequestHandler *owner)
+void WSRequestHandler::HandleGetCurrentRTMPSettings(WSRequestHandler *owner)
 {
-
-}
-
-void WSRequestHandler::HandleSetRTMPSettings(WSRequestHandler *owner)
-{
-	std::string rtmp_type = obs_data_get_string(owner->_requestData, "type");
-	
-	if (rtmp_type == "common")
+	if (owner->_client->property(PROP_AUTHENTICATED).toBool() == false)
 	{
-		
+		owner->SendErrorResponse("operation allowed only when authentication is enabled");
+		return;
 	}
-	else if (rtmp_type == "custom")
-	{
 
-	}
-	else
+	obs_output_t* streaming_output = obs_frontend_get_streaming_output();
+	if (!streaming_output)
 	{
-		owner->SendErrorResponse("unknown RTMP type");
+		owner->SendErrorResponse("streaming output not active");
+		return;
 	}
+
+	obs_service_t* service = obs_output_get_service(streaming_output);
+
+	const char* service_type = obs_service_get_type(service);
+	obs_data_t* settings = obs_service_get_settings(service);
+
+	obs_data_t* response = obs_data_create();
+	obs_data_set_string(response, "type", service_type);
+	obs_data_set_obj(response, "settings", settings);
+
+	owner->SendOKResponse(response);
+
+	obs_data_release(settings);
+	obs_data_release(response);
+	obs_service_release(service);
+	obs_output_release(streaming_output);
 }
 
 void WSRequestHandler::ErrNotImplemented(WSRequestHandler *owner)

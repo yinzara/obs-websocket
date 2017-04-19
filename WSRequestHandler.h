@@ -44,6 +44,7 @@ class WSRequestHandler : public QObject
 
 		void SendOKResponse(obs_data_t *additionalFields = NULL);
 		void SendErrorResponse(const char *errorMessage);
+
 		static void ErrNotImplemented(WSRequestHandler *owner);
 		
 		static void HandleGetVersion(WSRequestHandler *owner);
@@ -89,8 +90,7 @@ class WSRequestHandler : public QObject
 		static void HandleGetTransitionDuration(WSRequestHandler *owner);
 
 		static void HandleListStreamingServices(WSRequestHandler *owner);
-		static void HandleGetRTMPSettings(WSRequestHandler *owner);
-		static void HandleSetRTMPSettings(WSRequestHandler *owner);
+		static void HandleGetCurrentRTMPSettings(WSRequestHandler *owner);
 };
 
 #endif // WSPROTOCOL_H
