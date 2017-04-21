@@ -20,6 +20,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #define UTILS_H
 
 #include <QSpinBox>
+#include <QPushButton>
+#include <QLayout>
+#include <QListWidget>
+#include <QSystemTrayIcon>
 #include <stdio.h>
 #include <obs-module.h>
 
@@ -42,7 +46,26 @@ class Utils
 		static int GetTransitionDuration();
 		static void SetTransitionDuration(int ms);
 
+		static bool SetTransitionByName(const char* transition_name);
+
+		static QPushButton* GetPreviewModeButtonControl();
+		static QLayout* GetPreviewLayout();
+		static QListWidget* GetSceneListControl();
+		static obs_scene_t* SceneListItemToScene(QListWidgetItem* item);
+
+		static bool IsPreviewModeActive();
+		static void EnablePreviewMode();
+		static void DisablePreviewMode();
+		static void TogglePreviewMode();
+
+		static obs_scene_t* GetPreviewScene();
+		static void SetPreviewScene(const char* name);
+		static void TransitionToProgram();
+
 		static const char* OBSVersionString();
+
+		static QSystemTrayIcon* GetTrayIcon();
+		static void SysTrayNotify(QString &text, QSystemTrayIcon::MessageIcon n, QString title = QString("obs-websocket"));
 };
 
 #endif // UTILS_H

@@ -6,70 +6,133 @@ Messages exchanged between the client and the server are JSON objects.
 The protocol in general is based on the OBS Remote protocol created by Bill Hamilton, with new commands specific to OBS Studio.
 
 ### Table of contents
+* [Authentication](#authentication)
 * [Events](#events)
   - [Description](#description)
   - [Event Types](#event-types)
-    - ["SwitchScenes"](#switchscenes)
-    - ["ScenesChanged"](#sceneschanged)
-    - ["SourceOrderChanged"](#sourceorderchanged)
-    - ["SceneItemAdded"](#sceneitemadded)
-    - ["SceneItemRemoved"](#sceneitemremoved)
-    - ["SceneItemVisibilityChanged"](#sceneitemvisibilitychanged)
-    - ["SceneCollectionChanged"](#scenecollectionchanged)
-    - ["SceneCollectionListChanged"](#scenecollectionlistchanged)
-    - ["SwitchTransition"](#switchtransition)
-    - ["TransitionDurationChanged"](#transitiondurationchanged)
-    - ["TransitionListChanged"](#transitionlistchanged)
-    - ["TransitionBegin"](#transitionbegin)
-    - ["ProfileChanged"](#profilechanged)
-    - ["ProfileListChanged"](#profilelistchanged)
-    - ["StreamStarting"](#streamstarting)
-    - ["StreamStarted"](#streamstarted)
-    - ["StreamStopping"](#streamstopping)
-    - ["StreamStopped"](#streamstopped)
-    - ["RecordingStarting"](#recordingstarting)
-    - ["RecordingStarted"](#recordingstarted)
-    - ["RecordingStopping"](#recordingstopping)
-    - ["RecordingStopped"](#recordingstopped)
-    - ["StreamStatus"](#streamstatus)
-    - ["Exiting"](#exiting)
+    - **Scenes**
+      - ["SwitchScenes"](#switchscenes)
+      - ["ScenesChanged"](#sceneschanged)
+    - **Scene Items**
+      - ["SourceOrderChanged"](#sourceorderchanged)
+      - ["SceneItemAdded"](#sceneitemadded)
+      - ["SceneItemRemoved"](#sceneitemremoved)
+      - ["SceneItemVisibilityChanged"](#sceneitemvisibilitychanged)
+    - **Scene Collections**
+      - ["SceneCollectionChanged"](#scenecollectionchanged)
+      - ["SceneCollectionListChanged"](#scenecollectionlistchanged)
+    - **Transitions**
+      - ["SwitchTransition"](#switchtransition)
+      - ["TransitionDurationChanged"](#transitiondurationchanged)
+      - ["TransitionListChanged"](#transitionlistchanged)
+      - ["TransitionBegin"](#transitionbegin)
+    - **Studio Mode**
+      - ["PreviewSceneChanged"](#previewscenechanged)
+      - ["StudioModeSwitched"](#studiomodeswitched)
+    - **Profiles**
+      - ["ProfileChanged"](#profilechanged)
+      - ["ProfileListChanged"](#profilelistchanged)
+    - **Streaming**
+      - ["StreamStarting"](#streamstarting)
+      - ["StreamStarted"](#streamstarted)
+      - ["StreamStopping"](#streamstopping)
+      - ["StreamStopped"](#streamstopped)
+      - ["StreamStatus"](#streamstatus)
+    - **Recording**
+      - ["RecordingStarting"](#recordingstarting)
+      - ["RecordingStarted"](#recordingstarted)
+      - ["RecordingStopping"](#recordingstopping)
+      - ["RecordingStopped"](#recordingstopped)
+    - **Other**
+      - ["Exiting"](#exiting)
 * [Requests](#requests)
   - [Description](#description-1)
   - [Request Types](#request-types)
-    - ["GetVersion"](#getversion)
-    - ["GetAuthRequired"](#getauthrequired)
-    - ["Authenticate"](#authenticate)
-    - ["GetCurrentScene"](#getcurrentscene)
-    - ["SetCurrentScene"](#setcurrentscene)
-    - ["GetSceneList"](#getscenelist)
-    - ["SetSourceRender"](#setsourcerender)
-    - ["StartStopStreaming"](#startstopstreaming)
-    - ["StartStopRecording"](#startstoprecording)
-    - ["StartStreaming"](#startstreaming)
-    - ["StopStreaming"](#stopstreaming)
-    - ["StartRecording"](#startrecording)
-    - ["StopRecording"](#stoprecording)
-    - ["GetStreamingStatus"](#getstreamingstatus)
-    - ["GetTransitionList"](#gettransitionlist)
-    - ["GetCurrentTransition"](#getcurrenttransition)
-    - ["SetCurrentTransition"](#setcurrenttransition)
-    - ["SetTransitionDuration"](#settransitionduration)
-    - ["GetTransitionDuration"](#gettransitionduration)
-    - ["SetVolume"](#setvolume)
-    - ["GetVolume"](#getvolume)
-    - ["SetMute"](#setmute)
-    - ["ToggleMute"](#togglemute)
-    - ["SetSceneItemPosition"](#setsceneitemposition)
-    - ["SetSceneItemTransform"](#setsceneitemtransform)
-    - ["SetSceneItemCrop"](#setsceneitemcrop)
-    - ["SetCurrentSceneCollection"](#setcurrentscenecollection)
-    - ["GetCurrentSceneCollection"](#getcurrentscenecollection)
-    - ["ListSceneCollections"](#listscenecollections)
-    - ["SetCurrentProfile"](#setcurrentprofile)
-    - ["GetCurrentProfile"](#getcurrentprofile)
-    - ["ListProfiles"](#listprofiles)
-    - ["ListStreamingServices"](#liststreamingservices)
-* [Authentication](#authentication)
+    - **General**
+      - ["GetVersion"](#getversion)
+      - ["GetAuthRequired"](#getauthrequired)
+      - ["Authenticate"](#authenticate)
+    - **Scenes**
+      - ["GetCurrentScene"](#getcurrentscene)
+      - ["SetCurrentScene"](#setcurrentscene)
+      - ["GetSceneList"](#getscenelist)
+    - **Studio Mode**
+      - ["GetStudioModeStatus"](#getstudiomodestatus)
+      - ["SetPreviewScene"](#setpreviewscene)
+      - ["TransitionToProgram"](#transitiontoprogram)
+      - ["EnableStudioMode"](#enablestudiomode)
+      - ["DisableStudioMode"](#disablestudiomode)
+      - ["ToggleStudioMode"](#togglestudiomode)
+    - **Streaming**
+      - ["StartStopStreaming"](#startstopstreaming)
+      - ["StartStreaming"](#startstreaming)
+      - ["StopStreaming"](#stopstreaming)
+      - ["GetStreamingStatus"](#getstreamingstatus)
+      - ["ListStreamingServices"](#liststreamingservices)
+    - **Recording**
+      - ["StartStopRecording"](#startstoprecording)
+      - ["StartRecording"](#startrecording)
+      - ["StopRecording"](#stoprecording)
+      - ["GetStreamingStatus"](#getstreamingstatus)
+    - **Transitions**
+      - ["GetTransitionList"](#gettransitionlist)
+      - ["GetCurrentTransition"](#getcurrenttransition)
+      - ["SetCurrentTransition"](#setcurrenttransition)
+      - ["GetTransitionDuration"](#gettransitionduration)
+      - ["SetTransitionDuration"](#settransitionduration)
+    - **Sources**
+      - ["GetCurrentScene"](#getcurrentscene)
+      - ["GetSceneList"](#getscenelist)
+      - ["GetSpecialSources"](#getspecialsources)
+      - ["SetVolume"](#setvolume)
+      - ["GetVolume"](#getvolume)
+      - ["SetMute"](#setmute)
+      - ["GetMute"](#getmute)
+      - ["ToggleMute"](#togglemute)
+    - **Scene Items**
+      - ["SetSceneItemRender"](#setsourcerender) (a.k.a `SetSourceRender`)
+      - ["SetSceneItemPosition"](#setsceneitemposition)
+      - ["SetSceneItemTransform"](#setsceneitemtransform)
+      - ["SetSceneItemCrop"](#setsceneitemcrop)
+    - **Scene Collections**
+      - ["ListSceneCollections"](#listscenecollections)
+      - ["SetCurrentSceneCollection"](#setcurrentscenecollection)
+      - ["GetCurrentSceneCollection"](#getcurrentscenecollection)
+    - **Profiles**
+      - ["ListProfiles"](#listprofiles)
+      - ["SetCurrentProfile"](#setcurrentprofile)
+      - ["GetCurrentProfile"](#getcurrentprofile)
+
+## Authentication
+A call to [`GetAuthRequired`](#getauthrequired) gives the client two elements :
+- A challenge : a random string that will be used to generate the auth response
+- A salt : applied to the password when generating the auth response
+
+The client knows a password and must it to authenticate itself to the server.  
+However, it must keep this password secret, and it is the purpose of the authentication mecanism used by obs-websocket.
+
+After a call to [`GetAuthRequired`](#getauthrequired), the client knows a password (kept secret), a challenge and a salt (sent by the server).
+To generate the answer to the auth challenge, follow this procedure :
+- Concatenate the password with the salt sent by the server (in this order : password + server salt), then generate a binary SHA256 hash of the result and encode the resulting SHA256 binary hash to base64.
+- Concatenate the base64 secret with the challenge sent by the server (in this order : base64 secret + server challenge), then generate a binary SHA256 hash of the result and encode it to base64.
+- Voilà, this last base64 string is the auth response. You may now use it to authenticate to the server with the `Authenticate` request.
+
+Here's how it looks in pseudocode :
+```
+password = "supersecretpassword"
+challenge = "ztTBnnuqrqaKDzRM3xcVdbYm"
+salt = "PZVbYpvAnZut2SS6JNJytDm9"
+
+secret_string = password + salt
+secret_hash = binary_sha256(secret_string)
+secret = base64_encode(secret_hash)
+
+auth_response_string = secret + challenge
+auth_response_hash = binary_sha256(auth_response_string)
+auth_response = base64_encode(auth_response_hash)
+```
+
+A client can then authenticate to the server by calling [`Authenticate`](#authenticate) with the computed challenge response.
 
 ## Events
 ### Description
@@ -87,6 +150,7 @@ Additional fields will be present in the event message depending on the event ty
 #### "SwitchScenes"
 OBS is switching to another scene (called at the end of the transition).  
 - **scene-name** (string) : The name of the scene being switched to.
+- **sources** (array of objects) : List of sources composing the scene. Same specification as [`GetCurrentScene`](#getcurrentscene).
 
 ---
 
@@ -155,6 +219,19 @@ A transition other than "Cut" has begun.
 
 ---
 
+#### "PreviewSceneChanged"
+The selected Preview scene changed (only in Studio Mode).
+- **scene-name** (string) : Name of the scene being previewed.
+- **sources** (array of objects) : List of sources composing the scene. Same specification as [`GetCurrentScene`](#getcurrentscene).
+
+---
+
+#### "StudioModeSwitched"
+Studio Mode has been switched on or off.
+- **"new-state"** (bool) : new state of Studio Mode: true if enabled, false if disabled.
+
+---
+
 #### "ProfileChanged"
 Triggered when switching to another profile or when renaming the current profile.
 
@@ -173,7 +250,6 @@ A request to start streaming has been issued.
 
 #### "StreamStarted"  
 Streaming started successfully.  
-*New in OBS Studio*
 
 ---
 
@@ -185,31 +261,26 @@ A request to stop streaming has been issued.
 
 #### "StreamStopped"  
 Streaming stopped successfully.  
-*New in OBS Studio*
 
 ---
 
 #### "RecordingStarting"  
 A request to start recording has been issued.  
-*New in OBS Studio*
 
 ---
 
 #### "RecordingStarted"  
 Recording started successfully.  
-*New in OBS Studio*
 
 ---
 
 #### "RecordingStopping"
 A request to stop streaming has been issued.  
-*New in OBS Studio*
 
 ---
 
 #### "RecordingStopped"  
 Recording stopped successfully.  
-*New in OBS Studio*
 
 ---
 
@@ -229,8 +300,7 @@ Sent every 2 seconds with the following information :
 ---
 
 #### "Exiting"
-OBS is exiting.
-*New in OBS Studio*  
+OBS is exiting.  
 
 ---
 
@@ -301,6 +371,7 @@ Objects in the "sources" array have the following fields :
 - **"source_cy"** (integer) : height of the item (without scale applied)
 - **"cx"** (double) : width of the item (with scale applied)
 - **"cy"** (double) : height of the item (with scale applied)
+- **"render"** (bool) : visibility of the source in the scene
 
 ---
 
@@ -336,8 +407,73 @@ __Response__ : OK if source exists in the current scene, error otherwise.
 
 ---
 
+#### "GetStudioModeStatus"
+Tells if Studio Mode is currently enabled or disabled.
+
+__Request fields__ : none  
+__Response__ : always OK, with these additional fields :  
+- **"studio-mode"** (bool) : true if OBS is in Studio Mode, false otherwise.
+
+---
+
+#### "GetPreviewScene"
+Studio Mode only. Gets the name of the currently Previewed scene, along with a list of its sources.
+
+__Request fields__ : none  
+__Response__ : OK if Studio Mode is enabled, with the same fields as [`GetCurrentScene`](#getcurrentscene), error otherwise.
+
+---
+
+#### "SetPreviewScene"
+Studio Mode only. Sets the specified scene as the Previewed scene in Studio Mode.
+
+__Request fields__ :  
+- **"scene-name"** (string) : name of the scene to selected as the preview of Studio Mode
+
+__Response__ : OK if Studio Mode is enabled and specified scene exists, error otherwise.
+
+---
+
+#### "TransitionToProgram"
+Studio Mode only. Transitions the currently previewed scene to Program (main output).
+
+__Request fields__ :  
+- **"with-transition" (object, optional) : if specified, use this transition when switching from preview to program. This will change the current transition in the frontend to this one.
+
+__Response__ : OK if studio mode is enabled and optional transition exists, error otherwise.
+
+An object passed as `"with-transition"` in a request must have the following fields :  
+- **"name"** (string, optional) : transition name
+- **"duration"** (integer, optional) : transition duration in milliseconds
+
+---
+
+#### "EnableStudioMode"
+Enables Studio Mode.
+
+__Request fields__ : none  
+__Response__ : always OK. No additional fields.
+
+---
+
+#### "DisableStudioMode"
+Disables Studio Mode.
+
+__Request fields__ : none  
+__Response__ : always OK. No additional fields.
+
+---
+
+#### "ToggleStudioMode"
+Toggles Studio Mode on or off.
+
+__Request fields__ : none  
+__Response__ : always OK. No additional fields.
+
+---
+
 #### "StartStopStreaming"
-Toggle streaming on or off.
+Toggles streaming on or off.
 
 __Request fields__ : none  
 __Response__ : always OK. No additional fields.
@@ -345,11 +481,10 @@ __Response__ : always OK. No additional fields.
 ---
 
 #### "StartStopRecording"
-Toggle recording on or off.
+Toggles recording on or off.
 
 __Request fields__ : none  
 __Response__ : always OK. No additional fields.  
-*New in OBS Studio*
 
 ---
 
@@ -360,7 +495,6 @@ __Request fields__ :
 - **"with-settings"** (object, optional) : if specified, tells OBS to stream using these RTMP settings.
 
 __Response__ : always OK. No additional fields.  
-*New in OBS Studio*
 
 An object passed as `with-settings` in a request must have the following fields :  
 - **"type"** (string) : type of RTMP settings. Must be "rtmp_common" (simple RTMP configuration) or "rtmp_custom" (custom RTMP configuration)
@@ -385,7 +519,6 @@ Stop streaming.
 
 __Request fields__ : none  
 __Response__ : always OK. No additional fields.  
-*New in OBS Studio*
 
 ---
 
@@ -394,7 +527,6 @@ Start recording.
 
 __Request fields__ : none  
 __Response__ : always OK. No additional fields.  
-*New in OBS Studio*
 
 ---
 
@@ -403,7 +535,6 @@ Stop recording.
 
 __Request fields__ : none  
 __Response__ : always OK. No additional fields.  
-*New in OBS Studio*
 
 ---
 
@@ -431,8 +562,6 @@ __Response__ : always OK, with these additional fields :
 Objects in the "transitions" array have only one field :
 - **"name"** (string) : name of the transition
 
-*New in OBS Studio*  
-
 ---
 
 #### "GetCurrentTransition"
@@ -443,17 +572,13 @@ __Response__ : always OK, with these additional fields :
 - **"name"** (string) : name of the selected transition
 - **"duration"** (integer, only if transition supports this) : transition duration
 
-*New in OBS Studio*  
-
 ---
 
 #### "SetCurrentTransition"
 __Request fields__ :
 - **"transition-name"** (string) : The name of the transition.
 
-__Response__ : OK if specified transition exists, error otherwise.
-
-*New in OBS Studio*  
+__Response__ : OK if specified transition exists, error otherwise. 
 
 ---
 
@@ -465,8 +590,6 @@ __Request fields__ :
 
 __Response__ : always OK.
 
-*New in OBS Studio*
-
 ---
 
 #### "GetTransitionDuration"
@@ -475,8 +598,6 @@ Set the duration of the currently selected transition.
 __Request fields__ : none  
 __Response__ : always OK, with these additional fields :
 - **"transition-duration"** (integer) : current transition duration, in milliseconds
-
-*New in OBS Studio*
 
 ---
 
@@ -489,8 +610,6 @@ __Request fields__ :
 
 __Response__ : OK if specified source exists, error otherwise.
 
-*Updated for OBS Studio*
-
 ---
 
 #### "GetVolume"
@@ -500,11 +619,9 @@ __Request fields__ :
 - **"source"** (string) : name of the source
 
 __Response__ : OK if source exists, with these additional fields :
-- **"name"** (string) : name of the requested source
-- **"volume"** (double) : volume of the requested source, on a linear scale (0.0 to 1.0)
-- **"muted"** (bool) : mute status of the requested source
-
-*Updated for OBS Studio*
+- **"name"** (string) : source name
+- **"volume"** (double) : source volume, on a linear scale (0.0 to 1.0)
+- **"muted"** (bool) : source mute status
 
 ---
 
@@ -517,7 +634,17 @@ __Request fields__ :
 
 __Response__ : OK if specified source exists, error otherwise.
 
-*Updated for OBS Studio*
+---
+
+#### "GetMute"
+Get mute status of a specific source.
+
+__Request fields__ :
+- **"source"** (string) : the name of the source
+
+__Response__ : OK if source exists, with these additional fields :
+- **"name"** (string) : source name
+- **"muted"** (bool) : source mute status
 
 ---
 
@@ -529,7 +656,19 @@ __Request fields__ :
 
 __Response__ : OK if specified source exists, error otherwise.
 
-*Updated for OBS Studio*
+---
+
+#### "GetSpecialSources"
+Get configured special sources like Desktop Audio and Mic/Aux sources.
+
+__Request fields__ : none
+
+__Response__ : always OK, with these additional fields :  
+- **"desktop-1"** (string, optional) : Name of the first Desktop Audio capture source
+- **"desktop-1"** (string, optional) : Name of the second Desktop Audio capture source
+- **"mic-1"** (string, optional) : Name of the first Mic/Aux input source
+- **"mic-2"** (string, optional) : Name of the second Mic/Aux input source
+- **"mic-3"** (string, optional) : Name of the third Mic/Aux input source
 
 ---
 
@@ -542,8 +681,6 @@ __Request fields__ :
 
 __Response__ : OK if specified item exists, error otherwise.
 
-*New in OBS Studio*
-
 ---
 
 #### "SetSceneItemTransform"
@@ -555,8 +692,6 @@ __Request fields__ :
 - **"scene-name"** (string) : scene the item belongs to.  defaults to current scene.
 
 __Response__ : OK if specified item exists, error otherwise.
-
-*New in OBS Studio*
 
 ---
 
@@ -649,32 +784,3 @@ An object contained in `servers` array has the following fields :
 - **"url"** (string) : RTMP server url
 
 ---
-
-### Authentication
-A call to `GetAuthRequired` gives the client two elements :
-- A challenge : a random string that will be used to generate the auth response
-- A salt : applied to the password when generating the auth response
-
-The client knows a password and must it to authenticate itself to the server.  
-However, it must keep this password secret, and it is the purpose of the authentication mecanism used by obs-websocket.
-
-After a call to `GetAuthRequired`, the client knows a password (kept secret), a challenge and a salt (sent by the server).
-To generate the answer to the auth challenge, follow this procedure :
-- Concatenate the password with the salt sent by the server (in this order : password + server salt), then generate a binary SHA256 hash of the result and encode the resulting SHA256 binary hash to base64.
-- Concatenate the base64 secret with the challenge sent by the server (in this order : base64 secret + server challenge), then generate a binary SHA256 hash of the result and encode it to base64.
-- Voilà, this last base64 string is the auth response. You may now use it to authenticate to the server with the `Authenticate` request.
-
-Here's how it looks in pseudocode :
-```
-password = "supersecretpassword"
-challenge = "ztTBnnuqrqaKDzRM3xcVdbYm"
-salt = "PZVbYpvAnZut2SS6JNJytDm9"
-
-secret_string = password + salt
-secret_hash = binary_sha256(secret_string)
-secret = base64_encode(secret_hash)
-
-auth_response_string = secret + challenge
-auth_response_hash = binary_sha256(auth_response_string)
-auth_response = base64_encode(auth_response_hash)
-```

@@ -29,14 +29,30 @@ Here's a list of available language APIs for obs-websocket :
 
 I'd like to know what you're building with or for obs-websocket. If you do something in this fashion, feel free to drop me an email at `contact at slepin dot fr` !
 
+## Compiling obs-websocket
+See the [build instructions](BUILDING.md).
+
 ## Special thanks
 - [Brendan H.](https://github.com/haganbmj) : Code contributions and better English in the Protocol specification
 - [Mikhail Swift](https://github.com/mikhailswift) : Code contributions
 - [Tobias Frahmer](https://github.com/Frahmer) : German translation
-- [G-monitor](https://github.com/G-monitor) : Simplified Chinese and Traditional Chinese translations
+- [Genture](https://github.com/Genteure) : Simplified Chinese and Traditional Chinese translations
 - [Larissa Gabilan](https://github.com/laris151) : Portuguese translation
 - [Andy Asquelt](https://github.com/asquelt) : Polish translation
 - [Marcel Haazen](https://github.com/inpothet) : Dutch translation
+- Supporters of the project
 
-## Compiling obs-websocket
-See the [build instructions](BUILDING.md).
+## Supporters
+They have contributed financially to the project and made possible the addition of several features into obs-websocket. Many thanks to them!
+
+---
+
+[Support Class](http://supportclass.net) designs and develops professional livestreams, with services ranging from broadcast graphics design and integration to event organization, along many other skills.  
+
+[![Support Class](doc/supportclass_logo_blacktext.png)](http://supportclass.net)
+
+---
+
+[MediaUnit](http://www.mediaunit.no) is a Norwegian media company developing products and services for the media industry, primarly focused on web and events.  
+
+[![MediaUnit](doc/mediaunit_logo_black.png)](http://www.mediaunit.no/)
