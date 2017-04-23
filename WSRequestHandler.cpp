@@ -390,16 +390,21 @@ void WSRequestHandler::HandleStartStopRecording(WSRequestHandler *req)
 
 void WSRequestHandler::HandleStartStreaming(WSRequestHandler *req)
 {
-	if (obs_frontend_streaming_active() == false)
-		obs_frontend_streaming_start();
+	if (obs_frontend_streaming_active())
+	{
+		req->SendErrorResponse("streaming already active");
+		return;
+	}
+
+	obs_frontend_streaming_start();
 
 	if (req->hasField("with-settings"))
 	{
 		obs_data_t* withSettings = obs_data_get_obj(req->data, "with-settings");
 		obs_output_t* output = obs_frontend_get_streaming_output();
 
-		if (req->hasField("type") 
-		 || req->hasField("settings"))
+		if (obs_data_has_user_value(withSettings, "type") 
+			&& obs_data_has_user_value(withSettings, "settings"))
 		{
 			const char* service_type = obs_data_get_string(withSettings, "type");
 			obs_data_t* service_settings = obs_data_get_obj(withSettings, "settings");
