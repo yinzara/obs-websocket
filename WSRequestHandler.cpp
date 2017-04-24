@@ -79,7 +79,7 @@ WSRequestHandler::WSRequestHandler(QWebSocket *client) :
 	messageMap["ListProfiles"] = WSRequestHandler::HandleListProfiles;
 
 	messageMap["ListStreamingServices"] = WSRequestHandler::HandleListStreamingServices;
-	//messageMap["GetCurrentRTMPSettings"] = WSRequestHandler::HandleGetCurrentRTMPSettings; // Insecure
+	messageMap["GetCurrentRTMPSettings"] = WSRequestHandler::HandleGetCurrentRTMPSettings; // Insecure
 
 	messageMap["TransitionToProgram"] = WSRequestHandler::HandleTransitionToProgram;
 	messageMap["EnableStudioMode"] = WSRequestHandler::HandleEnableStudioMode;

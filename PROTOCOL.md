@@ -69,6 +69,7 @@ The protocol in general is based on the OBS Remote protocol created by Bill Hami
       - ["StopStreaming"](#stopstreaming)
       - ["GetStreamingStatus"](#getstreamingstatus)
       - ["ListStreamingServices"](#liststreamingservices)
+      - ["GetCurrentRTMPSettings"](#getcurrentrtmpsettings)
     - **Recording**
       - ["StartStopRecording"](#startstoprecording)
       - ["StartRecording"](#startrecording)
@@ -782,5 +783,28 @@ An object contained in the `services` array has the following fields :
 
 An object contained in `servers` array has the following fields :  
 - **"url"** (string) : RTMP server url
+
+---
+
+#### "GetCurrentRTMPSettings"
+Start streaming.
+
+__Request fields__ : none
+
+__Response__ : OK if authenticated and streaming is active, with these additional fields : 
+- **"type"** (string) : type of RTMP settings. "rtmp_common" (simple RTMP configuration) or "rtmp_custom" (custom RTMP configuration)
+- **"settings"** (object) : object describing the stream settings. Specific to settings type.
+
+Fields for `settings` if type is "rtmp_common" :  
+- **"service"** (string) : Streaming service name. Must be within the values listed by ["ListStreamingServices"](#liststreamingservices)
+- **"server"** (string) : One of the streaming of the specified service. Must be within the values listed by ["ListStreamingServices"](#liststreamingservices) for that service
+- **"key"** (string) : stream key
+
+Fields for `settings` if type is "rtmp_custom" : 
+- **"server"** (string) : RTMP server hostname/IP address
+- **"key"** (string) : Stream key
+- **"use_auth"** (bool) : Tells OBS to authenticate to the RTMP server with the username and password provided in the settings
+- **"username"** (string) : Username for RTMP authentication (if required)
+- **"password"** (string) : Password for RTMP authentication (if required)
 
 ---
