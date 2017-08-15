@@ -44,8 +44,13 @@ bool obs_module_load(void)
 	WSServer::Instance = new WSServer();
 	WSEvents::Instance = new WSEvents(WSServer::Instance);
 
-	if (config->ServerEnabled)
+	if (config->ServerEnabled) 
+	{
 		WSServer::Instance->Start(config->ServerPort);
+		if (!config->WSServerUrl.isEmpty() && config->WSServerUrl.isValid()) {
+			WSServer::Instance->ConnectToServer(config->WSServerUrl);
+		}
+	}
 
 	// UI setup
 	QAction *menu_action = (QAction*)obs_frontend_add_tools_menu_qaction(

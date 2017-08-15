@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>
 */
 
+
 #include <obs-frontend-api.h>
 
 #include "obs-websocket.h"
@@ -23,6 +24,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "WSServer.h"
 #include "settings-dialog.h"
 #include "ui_settings-dialog.h"
+
+#include <QPushButton>
 
 #define CHANGE_ME "changeme"
 
@@ -36,9 +39,12 @@ SettingsDialog::SettingsDialog(QWidget* parent) :
 		this, &SettingsDialog::AuthCheckboxChanged);
 	connect(ui->buttonBox, &QDialogButtonBox::accepted,
 		this, &SettingsDialog::FormAccepted);
+	connect(ui->serverUrl, &QLineEdit::textChanged,
+			this, &SettingsDialog::ServerUrlChanged);
 
 
 	AuthCheckboxChanged();
+	ServerUrlChanged(QStringLiteral(""));
 }
 
 void SettingsDialog::showEvent(QShowEvent* event)
@@ -52,6 +58,39 @@ void SettingsDialog::showEvent(QShowEvent* event)
 
 	ui->authRequired->setChecked(conf->AuthRequired);
 	ui->password->setText(CHANGE_ME);
+	
+	if (!conf->WSServerUrl.isEmpty())
+		ui->serverUrl->setText(conf->WSServerUrl.toString());
+	else
+		ui->serverUrl->setText("ws://");
+}
+
+void SettingsDialog::ServerUrlChanged(QString newUrl)
+{
+	if (newUrl.isEmpty())
+		newUrl = ui->serverUrl->text();
+	
+	QPushButton * okButton = ui->buttonBox->button(QDialogButtonBox::Ok);
+	if (newUrl == Q_NULLPTR || newUrl.isEmpty() || QStringLiteral("ws://") == newUrl)
+	{
+		okButton->setEnabled(true); //empty url is valid
+	}
+	else
+	{
+		if (newUrl.startsWith(QStringLiteral("ws://")) || newUrl.startsWith(QStringLiteral("wss://")))
+			okButton->setEnabled(QUrl(newUrl).isValid());
+		else
+			okButton->setEnabled(false);
+	}
+	
+	if (okButton->isEnabled())
+	{
+		ui->serverUrl->setStyleSheet("color: black;");
+	}
+	else
+	{
+		ui->serverUrl->setStyleSheet("color: red; text-decoration: underline;");
+	}
 }
 
 void SettingsDialog::ToggleShowHide()
@@ -78,6 +117,8 @@ void SettingsDialog::FormAccepted()
 	conf->ServerPort = ui->serverPort->value();
 	
 	conf->DebugEnabled = ui->debugEnabled->isChecked();
+	
+	conf->WSServerUrl = ui->serverUrl->text().length() > 5 ? QUrl(ui->serverUrl->text()) : QUrl(QStringLiteral(""));
 
 	if (ui->authRequired->isChecked())
 	{
@@ -102,9 +143,20 @@ void SettingsDialog::FormAccepted()
 	conf->Save();
 
 	if (conf->ServerEnabled)
+	{
 		WSServer::Instance->Start(conf->ServerPort);
+		if (!conf->WSServerUrl.isEmpty() && conf->WSServerUrl.isValid())
+		{
+			WSServer::Instance->ConnectToServer(conf->WSServerUrl);
+		}
+		else
+			WSServer::Instance->DisconnectFromServer();
+	}
 	else
+	{
 		WSServer::Instance->Stop();
+		WSServer::Instance->DisconnectFromServer();
+	}
 }
 
 SettingsDialog::~SettingsDialog()

@@ -38,6 +38,7 @@ public:
 private Q_SLOTS:
 	void AuthCheckboxChanged();
 	void FormAccepted();
+	void ServerUrlChanged(QString newUrl);
 
 private:
 	Ui::SettingsDialog* ui;

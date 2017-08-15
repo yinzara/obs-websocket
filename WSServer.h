@@ -23,6 +23,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QtCore/QList>
 #include <QtCore/QMutex>
 
+#include <QAbstractSocket>
+
 QT_FORWARD_DECLARE_CLASS(QWebSocketServer)
 QT_FORWARD_DECLARE_CLASS(QWebSocket)
 
@@ -38,18 +40,26 @@ class WSServer : public QObject
 		void Start(quint16 port);
 		void Stop();
 		void broadcast(QString message);
+		void ConnectToServer(QUrl url);
+		void DisconnectFromServer();
+		QWebSocket* GetRemoteControlWebSocket();
 		static WSServer* Instance;
+	
 
 	private Q_SLOTS:
 		void onNewConnection();
+		void onServerConnection();
+		void onServerError(QAbstractSocket::SocketError error);
 		void textMessageReceived(QString message);
 		void socketDisconnected();
+		void onServerDisconnect();
 
 	private:
 		QWebSocketServer* _wsServer;
 		QList<QWebSocket*> _clients;
 		QMutex _clMutex;
 		QThread* _serverThread;
+		QWebSocket* _serverConnection;
 };
 
 #endif // WSSERVER_H

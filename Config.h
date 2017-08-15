@@ -22,6 +22,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <mbedtls/entropy.h>
 #include <mbedtls/ctr_drbg.h>
 
+#include <QUrl>
+
 class Config
 {
 	public:
@@ -45,6 +47,7 @@ class Config
 		const char *Secret;
 		const char *Salt;
 		const char *SessionChallenge;
+		QUrl WSServerUrl;
 		bool SettingsLoaded;
 		
 		static Config* Current();

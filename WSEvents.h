@@ -41,6 +41,11 @@ class WSEvents : public QObject
 		const char* GetStreamingTimecode();
 		uint64_t GetRecordingTime();
 		const char* GetRecordingTimecode();
+	
+		void OnRemoteControlServerConnected();
+		void OnRemoteControlServerDisconnected();
+		void OnRemoteControlServerError();
+
 
 	private Q_SLOTS:
 		void deferredInitOperations();
@@ -49,7 +54,7 @@ class WSEvents : public QObject
 		void SelectedSceneChanged(
 			QListWidgetItem* current, QListWidgetItem* prev);
 		void ModeSwitchClicked(bool checked);
-
+	
 	private:
 		WSServer* _srv;
 		signal_handler_t* transition_handler;

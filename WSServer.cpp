@@ -19,9 +19,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QtWebSockets/QWebSocket>
 #include <QtCore/QThread>
 #include <QtCore/QByteArray>
+#include <QHostInfo>
+#include <QAbstractSocket>
+#include <QNetworkInterface>
+#include <QProcessEnvironment>
 #include <obs-frontend-api.h>
 
 #include "WSServer.h"
+#include "WSEvents.h"
 #include "obs-websocket.h"
 #include "Config.h"
 #include "Utils.h"
@@ -34,7 +39,8 @@ WSServer::WSServer(QObject* parent) :
 	QObject(parent),
 	_wsServer(Q_NULLPTR),
 	_clients(),
-	_clMutex(QMutex::Recursive)
+	_clMutex(QMutex::Recursive),
+	_serverConnection(Q_NULLPTR)
 {
 	_serverThread = new QThread();
 
@@ -94,7 +100,104 @@ void WSServer::broadcast(QString message)
 		pClient->sendTextMessage(message);
 	}
 
+	if (_serverConnection) {
+		_serverConnection->sendTextMessage(message);
+	}
+
 	_clMutex.unlock();
+}
+
+void WSServer::ConnectToServer(QUrl url)
+{
+	if (_serverConnection != Q_NULLPTR && url == _serverConnection->requestUrl()) {
+		return; // do nothing if the server is connected and the url isn't changing
+	}
+	
+	DisconnectFromServer();
+	
+	_serverConnection = new QWebSocket();
+	connect(_serverConnection, &QWebSocket::connected,
+			this, &WSServer::onServerConnection);
+	
+	connect(_serverConnection, &QWebSocket::disconnected,
+			this, &WSServer::onServerDisconnect);
+	
+	connect(_serverConnection, static_cast<void(QWebSocket::*)(QAbstractSocket::SocketError)>(&QWebSocket::error), this, &WSServer::onServerError);
+	
+	_serverConnection->open(url);
+	
+	blog(LOG_INFO, "opening server connection to %s",
+			url.toString().toUtf8().constData());
+
+}
+
+void WSServer::DisconnectFromServer()
+{
+	if (_serverConnection != Q_NULLPTR) {
+		QWebSocket* server = _serverConnection;
+		onServerDisconnect();
+		server->close();
+	}
+}
+
+void WSServer::onServerConnection()
+{
+	if (_serverConnection != Q_NULLPTR) {
+		
+		_clMutex.lock();
+		
+		connect(_serverConnection, &QWebSocket::textMessageReceived,
+			this, &WSServer::textMessageReceived);
+		_serverConnection->setProperty(PROP_AUTHENTICATED, true); // server connections are automatically authenticated since they were outbound (i.e. we should trust it)
+		
+		obs_data_t* connectMsg = obs_data_create();
+		obs_data_set_string(connectMsg, "update-type", "ClientConnected");
+		obs_data_set_string(connectMsg, "hostname", QProcessEnvironment::systemEnvironment().value(QStringLiteral("WS_HOSTNAME"), QHostInfo::localHostName()).toUtf8().constData());
+		
+		
+		_serverConnection->sendTextMessage(QString(obs_data_get_json(connectMsg)));
+
+		_clMutex.unlock();
+
+		obs_data_release(connectMsg);
+		
+		WSEvents::Instance->OnRemoteControlServerConnected();
+	}
+}
+
+void WSServer::onServerError(QAbstractSocket::SocketError error)
+{
+	WSEvents::Instance->OnRemoteControlServerError();
+	blog(LOG_INFO, "server connection error %s",
+			_serverConnection->errorString().toUtf8().constData());
+	
+}
+
+
+QWebSocket* WSServer::GetRemoteControlWebSocket()
+{
+	return _serverConnection;
+}
+
+void WSServer::onServerDisconnect()
+{
+	if (_serverConnection != Q_NULLPTR) {
+		WSEvents::Instance->OnRemoteControlServerDisconnected();
+		
+		disconnect(_serverConnection, &QWebSocket::connected,
+				   this, &WSServer::onServerConnection);
+		
+		disconnect(_serverConnection, &QWebSocket::disconnected,
+				   this, &WSServer::onServerDisconnect);
+		
+		disconnect(_serverConnection, static_cast<void(QWebSocket::*)(QAbstractSocket::SocketError)>(&QWebSocket::error),
+				   this, &WSServer::onServerError);
+		
+		disconnect(_serverConnection, &QWebSocket::textMessageReceived,
+				   this, &WSServer::textMessageReceived);
+		
+		_serverConnection = Q_NULLPTR;
+	}
 }
 
 void WSServer::onNewConnection()
@@ -139,6 +242,7 @@ void WSServer::textMessageReceived(QString message)
 		handler.processIncomingMessage(message);
 	}
 }
+
 
 void WSServer::socketDisconnected()
 {

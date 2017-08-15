@@ -104,6 +104,10 @@ WSRequestHandler::WSRequestHandler(QWebSocket* client) :
 	messageMap["GetBrowserSourceProperties"] = WSRequestHandler::HandleGetBrowserSourceProperties;
 	messageMap["SetBrowserSourceProperties"] = WSRequestHandler::HandleSetBrowserSourceProperties;
 
+	messageMap["GetRemoteControlServerStatus"] = WSRequestHandler::HandleGetRemoteControlServerStatus;
+	messageMap["ConnectToRemoteControlServer"] = WSRequestHandler::HandleConnectToRemoteControlServer;
+	messageMap["DisconnectFromRemoteControlServer"] = WSRequestHandler::HandleDisconnectFromRemoteControlServer;
+	
 	authNotRequired.insert("GetVersion");
 	authNotRequired.insert("GetAuthRequired");
 	authNotRequired.insert("Authenticate");
@@ -1708,4 +1712,77 @@ void WSRequestHandler::HandleSetBrowserSourceProperties(WSRequestHandler* req)
 		req->SendErrorResponse("specified scene item doesn't exist");
 	}
 	obs_source_release(scene);
+}
+
+const char* GetServerStatus(QWebSocket* server)
+{
+	if (server == Q_NULLPTR) {
+		return "DIS";
+	} else {
+		if (server->isValid())
+			return "CON";
+		else
+			return "ERR";
+	}
+}
+
+void WSRequestHandler::HandleGetRemoteControlServerStatus(WSRequestHandler* req)
+{
+	obs_data_t* response = obs_data_create();
+	QWebSocket* server = WSServer::Instance->GetRemoteControlWebSocket();
+	
+	obs_data_set_string(response, "status", GetServerStatus(server));
+	if (server != Q_NULLPTR)
+	{
+		if (!server->errorString().isEmpty())
+			obs_data_set_string(response, "error", server->errorString().toUtf8().constData());
+		obs_data_set_string(response, "url", server->requestUrl().toString().toUtf8().constData());
+	}
+	req->SendResponse(response);
+	obs_data_release(response);
+}
+
+void WSRequestHandler::HandleConnectToRemoteControlServer(WSRequestHandler* req)
+{
+	const char* url = req->hasField("url") ? obs_data_get_string(req->data, "url") : Q_NULLPTR;
+	if (!url || url == Q_NULLPTR || strlen(url) == 0)
+	{
+		req->SendErrorResponse("'url' is a required parameter to connect message");
+	}
+	else
+	{
+		QString qUrlString = QString(url);
+		if (!qUrlString.startsWith(QStringLiteral("ws://")) && !qUrlString.startsWith(QStringLiteral("wss://")))
+		{
+			req->SendErrorResponse("'url' must start with ws:// or wss://");
+			return;
+		}
+		
+		QUrl qUrl = QUrl(qUrlString);
+		if (!qUrl.isValid())
+		{
+			req->SendErrorResponse("'url' must be a valid URL starting with ws:// or wss://");
+			return;
+		}
+		
+		if (obs_data_get_bool(req->data, "save"))
+		{
+			Config::Current()->WSServerUrl = url;
+			Config::Current()->Save();
+		}
+		
+		WSServer::Instance->ConnectToServer(qUrl);
+		req->SendOKResponse();
+	}
+}
+
+void WSRequestHandler::HandleDisconnectFromRemoteControlServer(WSRequestHandler* req)
+{
+	if (WSServer::Instance->GetRemoteControlWebSocket() == Q_NULLPTR)
+		req->SendErrorResponse("Server already disconnected");
+	else
+	{
+		WSServer::Instance->DisconnectFromServer();
+		req->SendOKResponse();
+	}
 }
