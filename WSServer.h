@@ -19,10 +19,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #ifndef WSSERVER_H
 #define WSSERVER_H
 
+#include <QtMath>
+
 #include <QtCore/QObject>
 #include <QtCore/QList>
 #include <QtCore/QMutex>
 
+#include <QTimer>
 #include <QAbstractSocket>
 
 QT_FORWARD_DECLARE_CLASS(QWebSocketServer)
@@ -32,9 +35,20 @@ QT_FORWARD_DECLARE_CLASS(QWebSocket)
 
 class WSServer : public QObject
 {
+	
+	
 	Q_OBJECT
 
 	public:
+	
+		enum WSRemoteControlServerStatus {
+			ConnectedState,
+			ConnectingState,
+			DisconnectedState,
+			ErrorState
+		};
+		Q_ENUM(WSRemoteControlServerStatus)
+	
 		explicit WSServer(QObject* parent = Q_NULLPTR);
 		virtual ~WSServer();
 		void Start(quint16 port);
@@ -43,6 +57,7 @@ class WSServer : public QObject
 		void ConnectToServer(QUrl url);
 		void DisconnectFromServer();
 		QWebSocket* GetRemoteControlWebSocket();
+		WSRemoteControlServerStatus GetRemoteControlServerStatus();
 		static WSServer* Instance;
 	
 
@@ -53,6 +68,8 @@ class WSServer : public QObject
 		void textMessageReceived(QString message);
 		void socketDisconnected();
 		void onServerDisconnect();
+		void scheduleServerReconnect();
+		void onReconnect();
 
 	private:
 		QWebSocketServer* _wsServer;
@@ -60,6 +77,10 @@ class WSServer : public QObject
 		QMutex _clMutex;
 		QThread* _serverThread;
 		QWebSocket* _serverConnection;
+		QUrl _serverUrl;
+		QTimer* _reconnectTimer;
+		WSRemoteControlServerStatus _currentStatus;
+		qreal _reconnectCount;
 };
 
 #endif // WSSERVER_H

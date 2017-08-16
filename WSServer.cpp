@@ -31,6 +31,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "Config.h"
 #include "Utils.h"
 
+#define DEFAULT_WS_ORIGIN QStringLiteral("https://github.com/Palakis/obs-websocket")
+#define WS_HOSTNAME_ENV_VARIABLE QStringLiteral("WS_HOSTNAME")
+#define WS_ORIGIN_ENV_VARIABLE QStringLiteral("WS_ORIGIN")
+
 QT_USE_NAMESPACE
 
 WSServer* WSServer::Instance = nullptr;
@@ -40,7 +44,11 @@ WSServer::WSServer(QObject* parent) :
 	_wsServer(Q_NULLPTR),
 	_clients(),
 	_clMutex(QMutex::Recursive),
-	_serverConnection(Q_NULLPTR)
+	_serverConnection(Q_NULLPTR),
+	_serverUrl(QUrl()),
+	_reconnectTimer(Q_NULLPTR),
+	_currentStatus(WSRemoteControlServerStatus::DisconnectedState),
+	_reconnectCount(1)
 {
 	_serverThread = new QThread();
 
@@ -109,13 +117,18 @@ void WSServer::broadcast(QString message)
 
 void WSServer::ConnectToServer(QUrl url)
 {
-	if (_serverConnection != Q_NULLPTR && url == _serverConnection->requestUrl()) {
+	if (_serverUrl == url)
+	{
 		return; // do nothing if the server is connected and the url isn't changing
 	}
 	
 	DisconnectFromServer();
 	
-	_serverConnection = new QWebSocket();
+	_currentStatus = WSRemoteControlServerStatus::ConnectingState;
+	
+	_serverUrl = url;
+	
+	_serverConnection = new QWebSocket(QProcessEnvironment::systemEnvironment().value(WS_ORIGIN_ENV_VARIABLE, DEFAULT_WS_ORIGIN), QWebSocketProtocol::VersionLatest, this);
 	connect(_serverConnection, &QWebSocket::connected,
 			this, &WSServer::onServerConnection);
 	
@@ -128,21 +141,40 @@ void WSServer::ConnectToServer(QUrl url)
 	
 	blog(LOG_INFO, "opening server connection to %s",
 			url.toString().toUtf8().constData());
-
 }
 
 void WSServer::DisconnectFromServer()
 {
-	if (_serverConnection != Q_NULLPTR) {
+	if (_serverConnection != Q_NULLPTR)
+	{
+		_serverUrl = QUrl();
 		QWebSocket* server = _serverConnection;
 		onServerDisconnect();
 		server->close();
+		_currentStatus = WSRemoteControlServerStatus::DisconnectedState;
+		_reconnectCount = 1;
+		if (_reconnectTimer != Q_NULLPTR)
+		{
+			_reconnectTimer->stop();
+			
+			disconnect(_reconnectTimer, &QTimer::timeout,
+					   this, &WSServer::onReconnect);
+			_reconnectTimer = Q_NULLPTR;
+		}
 	}
+}
+
+WSServer::WSRemoteControlServerStatus WSServer::GetRemoteControlServerStatus()
+{
+	return _currentStatus;
 }
 
 void WSServer::onServerConnection()
 {
-	if (_serverConnection != Q_NULLPTR) {
+	if (_serverConnection != Q_NULLPTR)
+	{
+		_reconnectCount = 1;
+		_currentStatus = WSRemoteControlServerStatus::ConnectedState;
 		
 		_clMutex.lock();
 		
@@ -152,7 +184,7 @@ void WSServer::onServerConnection()
 		
 		obs_data_t* connectMsg = obs_data_create();
 		obs_data_set_string(connectMsg, "update-type", "ClientConnected");
-		obs_data_set_string(connectMsg, "hostname", QProcessEnvironment::systemEnvironment().value(QStringLiteral("WS_HOSTNAME"), QHostInfo::localHostName()).toUtf8().constData());
+		obs_data_set_string(connectMsg, "hostname", QProcessEnvironment::systemEnvironment().value(WS_HOSTNAME_ENV_VARIABLE, QHostInfo::localHostName()).toUtf8().constData());
 		
 		
 		_serverConnection->sendTextMessage(QString(obs_data_get_json(connectMsg)));
@@ -170,7 +202,53 @@ void WSServer::onServerError(QAbstractSocket::SocketError error)
 	WSEvents::Instance->OnRemoteControlServerError();
 	blog(LOG_INFO, "server connection error %s",
 			_serverConnection->errorString().toUtf8().constData());
+	if (_currentStatus != WSRemoteControlServerStatus::DisconnectedState)
+	{
+		_currentStatus = WSRemoteControlServerStatus::ErrorState;
+	}
+	scheduleServerReconnect();
+}
+
+void WSServer::scheduleServerReconnect()
+{
+	if (!_serverUrl.isEmpty() && _reconnectTimer == Q_NULLPTR && (_serverConnection == Q_NULLPTR || _serverConnection->state() != QAbstractSocket::ConnectedState))
+	{
+		_reconnectTimer = new QTimer(this);
+		_reconnectTimer->setSingleShot(true);
+		_reconnectTimer->setInterval(qrand() % ((int)(qPow(2.0, _reconnectCount) - 1.0) * 1000)); // exponential backoff [generate pseudorandom number between 0 and (2^k-1)*1000 milliseconds] where k is the number of reconnection attepts
+		_reconnectTimer->setTimerType(Qt::TimerType::CoarseTimer);
+		connect(_reconnectTimer, &QTimer::timeout,
+				this, &WSServer::onReconnect);
+		_reconnectTimer->start();
+		
+		
+		if (_reconnectCount < 5) //only go to a max of 5 so that the reconnect interval never goes above 30 seconds (i.e. 2^5-1=31)
+			_reconnectCount++;
+	}
+}
+
+void WSServer::onReconnect()
+{
+	if (_reconnectTimer != Q_NULLPTR)
+	{
+		disconnect(_reconnectTimer, &QTimer::timeout,
+			this, &WSServer::onReconnect);
+		_reconnectTimer = Q_NULLPTR;
+	}
 	
+	QUrl url = _serverUrl;
+	if (_serverConnection != Q_NULLPTR)
+	{
+		if (_serverConnection->state() == QAbstractSocket::SocketState::ConnectedState)
+		{
+			//the socket is connected, no need to do anything
+			return;
+		}
+		
+		_serverUrl = QUrl();
+		DisconnectFromServer();
+	}
+	ConnectToServer(url);
 }
 
 
@@ -181,7 +259,8 @@ QWebSocket* WSServer::GetRemoteControlWebSocket()
 
 void WSServer::onServerDisconnect()
 {
-	if (_serverConnection != Q_NULLPTR) {
+	if (_serverConnection != Q_NULLPTR)
+	{
 		WSEvents::Instance->OnRemoteControlServerDisconnected();
 		
 		disconnect(_serverConnection, &QWebSocket::connected,
@@ -197,6 +276,12 @@ void WSServer::onServerDisconnect()
 				   this, &WSServer::textMessageReceived);
 		
 		_serverConnection = Q_NULLPTR;
+		
+		if (_currentStatus != WSRemoteControlServerStatus::ErrorState)
+			_currentStatus = WSRemoteControlServerStatus::DisconnectedState;
+		
+		if (!_serverUrl.isEmpty())
+			scheduleServerReconnect();
 	}
 }
 

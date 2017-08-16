@@ -69,21 +69,22 @@ WSEvents::WSEvents(WSServer* srv)
 		this, SLOT(TransitionDurationChanged(int)));
 
 	QTimer* statusTimer = new QTimer();
-	connect(statusTimer, SIGNAL(timeout()),
-		this, SLOT(StreamStatus()));
+	connect(statusTimer, &QTimer::timeout,
+			this, &WSEvents::StreamStatus);
 	statusTimer->start(2000); // equal to frontend's constant BITRATE_UPDATE_SECONDS
 
 	QListWidget* sceneList = Utils::GetSceneListControl();
-	connect(sceneList, SIGNAL(currentItemChanged(QListWidgetItem*, QListWidgetItem*)),
-		this, SLOT(SelectedSceneChanged(QListWidgetItem*, QListWidgetItem*)));
+	connect(sceneList, &QListWidget::currentItemChanged,
+			this, &WSEvents::SelectedSceneChanged);
 
 	QPushButton* modeSwitch = Utils::GetPreviewModeButtonControl();
-	connect(modeSwitch, SIGNAL(clicked(bool)), this, SLOT(ModeSwitchClicked(bool)));
+	connect(modeSwitch, &QPushButton::clicked,
+			this, &WSEvents::ModeSwitchClicked);
 
 	transition_handler = nullptr;
 	scene_handler = nullptr;
 
-	QTimer::singleShot(1000, this, SLOT(deferredInitOperations()));
+	QTimer::singleShot(1000, this, &WSEvents::deferredInitOperations);
 
 	_streaming_active = false;
 	_recording_active = false;

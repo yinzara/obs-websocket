@@ -99,7 +99,7 @@ void Config::Load()
 	Secret = config_get_string(obs_config, SECTION_NAME, PARAM_SECRET);
 	Salt = config_get_string(obs_config, SECTION_NAME, PARAM_SALT);
 
-	WSServerUrl = QString(config_get_string(obs_config, SECTION_NAME, PARAM_WS_SERVER_URL));
+	WSServerUrl = QUrl(QString(config_get_string(obs_config, SECTION_NAME, PARAM_WS_SERVER_URL)));
 }
 
 void Config::Save()

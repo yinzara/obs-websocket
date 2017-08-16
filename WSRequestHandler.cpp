@@ -1714,27 +1714,31 @@ void WSRequestHandler::HandleSetBrowserSourceProperties(WSRequestHandler* req)
 	obs_source_release(scene);
 }
 
-const char* GetServerStatus(QWebSocket* server)
+const char* GetServerStatus(WSServer::WSRemoteControlServerStatus status)
 {
-	if (server == Q_NULLPTR) {
-		return "DIS";
-	} else {
-		if (server->isValid())
-			return "CON";
-		else
-			return "ERR";
+	switch (status)
+	{
+		case WSServer::ConnectingState:
+			return "CONNECTING";
+		case WSServer::ConnectedState:
+			return "CONNECTED";
+		case WSServer::ErrorState:
+			return "ERROR";
+		case WSServer::DisconnectedState:
+			return "DISCONNECTED";
 	}
 }
 
 void WSRequestHandler::HandleGetRemoteControlServerStatus(WSRequestHandler* req)
 {
 	obs_data_t* response = obs_data_create();
-	QWebSocket* server = WSServer::Instance->GetRemoteControlWebSocket();
+	WSServer::WSRemoteControlServerStatus status = WSServer::Instance->GetRemoteControlServerStatus();
+	obs_data_set_string(response, "status", GetServerStatus(status));
 	
-	obs_data_set_string(response, "status", GetServerStatus(server));
+	QWebSocket* server = WSServer::Instance->GetRemoteControlWebSocket();
 	if (server != Q_NULLPTR)
 	{
-		if (!server->errorString().isEmpty())
+		if (status == WSServer::WSRemoteControlServerStatus::ErrorState)
 			obs_data_set_string(response, "error", server->errorString().toUtf8().constData());
 		obs_data_set_string(response, "url", server->requestUrl().toString().toUtf8().constData());
 	}
