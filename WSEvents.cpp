@@ -51,7 +51,7 @@ const char* ns_to_timestamp(uint64_t ns)
 	uint64_t ms_part = ms % 1000;
 
 	char* ts = (char*)bmalloc(64);
-	sprintf(ts, "%02d:%02d:%02d.%03d",
+	sprintf(ts, "%02llu:%02llu:%02llu.%03llu",
 		hours_part, minutes_part, secs_part, ms_part);
 
 	return ts;
