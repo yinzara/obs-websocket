@@ -70,6 +70,8 @@ class WSServer : public QObject
 		void onServerDisconnect();
 		void scheduleServerReconnect();
 		void onReconnect();
+		void onServerConnectTimeout();
+		void cancelReconnect();
 
 	private:
 		QWebSocketServer* _wsServer;
