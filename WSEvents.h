@@ -42,9 +42,7 @@ class WSEvents : public QObject
 		uint64_t GetRecordingTime();
 		const char* GetRecordingTimecode();
 	
-		void OnRemoteControlServerConnected();
-		void OnRemoteControlServerDisconnected();
-		void OnRemoteControlServerError();
+		void OnRemoteControlServerStateChange();
 
 
 	private Q_SLOTS:

@@ -445,26 +445,11 @@ void WSEvents::OnExit()
 	broadcastUpdate("Exiting");
 }
 
-void WSEvents::OnRemoteControlServerConnected()
+void WSEvents::OnRemoteControlServerStateChange()
 {
 	// New update type specific to OBS Studio
-	broadcastUpdate("RemoteControlServerConnected");
-}
-
-void WSEvents::OnRemoteControlServerDisconnected()
-{
-	// New update type specific to OBS Studio
-	broadcastUpdate("RemoteControlServerDisconnected");
-}
-
-void WSEvents::OnRemoteControlServerError()
-{
-	// New update type specific to OBS Studio
-	obs_data_t* data = obs_data_create();
-	QString error = WSServer::Instance->GetRemoteControlWebSocket()->errorString();
-	if (error != Q_NULLPTR && !error.isEmpty())
-		obs_data_set_string(data, "error", error.toUtf8().constData());
-	broadcastUpdate("RemoteControlServerError", data);
+	obs_data_t* data = WSServer::Instance->GetRemoteControlServerData();
+	broadcastUpdate("RemoteControlServerStateChange", data);
 	obs_data_release(data);
 }
 

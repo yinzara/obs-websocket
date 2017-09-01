@@ -23,6 +23,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "obs-websocket.h"
 #include "Config.h"
 #include "Utils.h"
+#include <QProcessEnvironment>
 #include <qstring.h>
 
 bool str_valid(const char* str)
@@ -43,6 +44,7 @@ WSRequestHandler::WSRequestHandler(QWebSocket* client) :
 	messageMap["GetVersion"] = WSRequestHandler::HandleGetVersion;
 	messageMap["GetAuthRequired"] = WSRequestHandler::HandleGetAuthRequired;
 	messageMap["Authenticate"] = WSRequestHandler::HandleAuthenticate;
+	messageMap["SetAuthInfo"] = WSRequestHandler::HandleSetAuthInfo;
 
 	messageMap["SetCurrentScene"] = WSRequestHandler::HandleSetCurrentScene;
 	messageMap["GetCurrentScene"] = WSRequestHandler::HandleGetCurrentScene;
@@ -266,6 +268,36 @@ void WSRequestHandler::HandleAuthenticate(WSRequestHandler* req)
 	}
 }
 
+void WSRequestHandler::HandleSetAuthInfo(WSRequestHandler *req)
+{
+	if (!req->hasField("auth"))
+	{
+		req->SendErrorResponse("missing request parameters");
+		return;
+	}
+	
+	const char* auth = obs_data_get_string(req->data, "auth");
+	if (!str_valid(auth))
+	{
+		req->SendErrorResponse("auth not specified!");
+		return;
+	}
+	
+	if (req->_client->property(PROP_AUTHENTICATED).toBool())
+	{
+		Config* config = Config::Current();
+		config->AuthRequired = true;
+		config->SetPassword(auth);
+		config->Save();
+		
+		req->SendOKResponse();
+	}
+	else
+	{
+		req->SendErrorResponse("Cannot set auth details if not authenticated.");
+	}
+}
+
 void WSRequestHandler::HandleSetCurrentScene(WSRequestHandler* req)
 {
 	if (!req->hasField("scene-name"))
@@ -420,92 +452,91 @@ void WSRequestHandler::HandleStartStreaming(WSRequestHandler* req)
 		obs_data_t* streamData = obs_data_get_obj(req->data, "stream");
 		obs_service_t* currentService = nullptr;
 		
-		if (streamData)
+		currentService =  obs_frontend_get_streaming_service();
+		obs_service_addref(currentService);
+		
+		obs_service_t* service = _service;
+		const char* currentServiceType = obs_service_get_type(currentService);
+		
+		const char* requestedType = obs_data_has_user_value(streamData, "type") ? obs_data_get_string(streamData, "type") : currentServiceType;
+		const char* serviceType = service != nullptr ? obs_service_get_type(service) : currentServiceType;
+		obs_data_t* settings = obs_data_get_obj(streamData, "settings");
+		
+		
+		obs_data_t* metadata = obs_data_has_user_value(streamData, "metadata") ? obs_data_get_obj(streamData, "metadata") : obs_data_create();
+		if (!obs_data_has_user_value(metadata, "user"))  //special case to pass current system user to the stream
 		{
-			currentService =  obs_frontend_get_streaming_service();
-			obs_service_addref(currentService);
-			
-			obs_service_t* service = _service;
-			const char* currentServiceType = obs_service_get_type(currentService);
-			
-			const char* requestedType = obs_data_has_user_value(streamData, "type") ? obs_data_get_string(streamData, "type") : currentServiceType;
-			const char* serviceType = service != nullptr ? obs_service_get_type(service) : currentServiceType;
-			obs_data_t* settings = obs_data_get_obj(streamData, "settings");
-			
-			
-			obs_data_t* metadata = obs_data_get_obj(streamData, "metadata");
-			QString* query = Utils::ParseDataToQueryString(metadata);
-			
-			if (strcmp(requestedType, serviceType) != 0)
+			QString user = QProcessEnvironment::systemEnvironment().value(QStringLiteral("USER"), QProcessEnvironment::systemEnvironment().value(QStringLiteral("USERNAME"), QStringLiteral("")));
+			if (!user.isEmpty())
 			{
-				if (settings)
-				{
-					obs_service_release(service);
-					service = nullptr; //different type so we can't reuse the existing service instance
-				}
-				else
-				{
-					req->SendErrorResponse("Service type requested does not match currently configured type and no 'settings' were provided");
-					return;
-				}
+				obs_data_set_string(metadata, "user", user.toUtf8().constData());
+			}
+		}
+		QString* query = Utils::ParseDataToQueryString(metadata);
+		
+		if (strcmp(requestedType, serviceType) != 0)
+		{
+			if (settings)
+			{
+				obs_service_release(service);
+				service = nullptr; //different type so we can't reuse the existing service instance
 			}
 			else
 			{
-				//if type isn't changing we should overlay the settings we got with the existing settings
-				obs_data_t* existingSettings = obs_service_get_settings(currentService);
-				obs_data_t* newSettings = obs_data_create(); //by doing this you can send a request to the websocket that only contains a setting you want to change instead of having to do a get and then change them
-				
-				obs_data_apply(newSettings, existingSettings); //first apply the existing settings
-				
-				obs_data_apply(newSettings, settings); //then apply the settings from the request should they exist
-				obs_data_release(settings);
-				
-				settings = newSettings;
-				obs_data_release(existingSettings);
+				req->SendErrorResponse("Service type requested does not match currently configured type and no 'settings' were provided");
+				return;
 			}
+		}
+		else
+		{
+			//if type isn't changing we should overlay the settings we got with the existing settings
+			obs_data_t* existingSettings = obs_service_get_settings(currentService);
+			obs_data_t* newSettings = obs_data_create(); //by doing this you can send a request to the websocket that only contains a setting you want to change instead of having to do a get and then change them
 			
-			if (service == nullptr)
-			{  //create the new custom service setup by the websocket
-				service = obs_service_create(requestedType, "websocket_custom_service", settings, nullptr);
-			}
+			obs_data_apply(newSettings, existingSettings); //first apply the existing settings
 			
-			//Supporting adding metadata parameters to key query string
-			if (query && query->length() > 0) {
-				const char* key = obs_data_get_string(settings, "key");
-				int keylen = strlen(key);
-				bool hasQuestionMark = false;
-				for (int i = 0; i < keylen; i++) {
-					if (key[i] == '?') {
-						hasQuestionMark = true;
-						break;
-					}
-				}
-				if (hasQuestionMark) {
-					query->prepend('&');
-				} else {
-					query->prepend('?');
-				}
-				query->prepend(key);
-				key = query->toUtf8();
-				obs_data_set_string(settings, "key", key);
-			}
-			
-			obs_service_update(service, settings);
+			obs_data_apply(newSettings, settings); //then apply the settings from the request should they exist
 			obs_data_release(settings);
-			obs_data_release(metadata);
-			_service = service;
-			obs_frontend_set_streaming_service(_service);
-		} else if (_service != nullptr) {
-			obs_service_release(_service);
-			_service = nullptr;
+			
+			settings = newSettings;
+			obs_data_release(existingSettings);
 		}
 		
+		if (service == nullptr)
+		{  //create the new custom service setup by the websocket
+			service = obs_service_create(requestedType, "websocket_custom_service", settings, nullptr);
+		}
+		
+		//Supporting adding metadata parameters to key query string
+		if (query && query->length() > 0) {
+			const char* key = obs_data_get_string(settings, "key");
+			int keylen = strlen(key);
+			bool hasQuestionMark = false;
+			for (int i = 0; i < keylen; i++) {
+				if (key[i] == '?') {
+					hasQuestionMark = true;
+					break;
+				}
+			}
+			if (hasQuestionMark) {
+				query->prepend('&');
+			} else {
+				query->prepend('?');
+			}
+			query->prepend(key);
+			key = query->toUtf8().constData();
+			obs_data_set_string(settings, "key", key);
+		}
+		
+		obs_service_update(service, settings);
+		obs_data_release(settings);
+		obs_data_release(metadata);
+		_service = service;
+		
+		obs_frontend_set_streaming_service(_service);
 		obs_frontend_streaming_start();
-		
-		if (_service != nullptr) {
-			obs_frontend_set_streaming_service(currentService);
-		}
-		
+		obs_frontend_set_streaming_service(currentService);
+				
 		req->SendOKResponse();
 		obs_service_release(currentService);
 	}
@@ -1714,34 +1745,9 @@ void WSRequestHandler::HandleSetBrowserSourceProperties(WSRequestHandler* req)
 	obs_source_release(scene);
 }
 
-const char* GetServerStatus(WSServer::WSRemoteControlServerStatus status)
-{
-	switch (status)
-	{
-		case WSServer::ConnectingState:
-			return "CONNECTING";
-		case WSServer::ConnectedState:
-			return "CONNECTED";
-		case WSServer::ErrorState:
-			return "ERROR";
-		case WSServer::DisconnectedState:
-			return "DISCONNECTED";
-	}
-}
-
 void WSRequestHandler::HandleGetRemoteControlServerStatus(WSRequestHandler* req)
 {
-	obs_data_t* response = obs_data_create();
-	WSServer::WSRemoteControlServerStatus status = WSServer::Instance->GetRemoteControlServerStatus();
-	obs_data_set_string(response, "status", GetServerStatus(status));
-	
-	QWebSocket* server = WSServer::Instance->GetRemoteControlWebSocket();
-	if (server != Q_NULLPTR)
-	{
-		if (status == WSServer::WSRemoteControlServerStatus::ErrorState)
-			obs_data_set_string(response, "error", server->errorString().toUtf8().constData());
-		obs_data_set_string(response, "url", server->requestUrl().toString().toUtf8().constData());
-	}
+	obs_data_t* response = WSServer::Instance->GetRemoteControlServerData();
 	req->SendResponse(response);
 	obs_data_release(response);
 }
@@ -1782,7 +1788,7 @@ void WSRequestHandler::HandleConnectToRemoteControlServer(WSRequestHandler* req)
 
 void WSRequestHandler::HandleDisconnectFromRemoteControlServer(WSRequestHandler* req)
 {
-	if (WSServer::Instance->GetRemoteControlWebSocket() == Q_NULLPTR)
+	if (WSServer::Instance->GetRemoteControlServerStatus() == WSServer::DisconnectedState)
 		req->SendErrorResponse("Server already disconnected");
 	else
 	{

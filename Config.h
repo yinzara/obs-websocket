@@ -47,6 +47,7 @@ class Config
 		const char *Secret;
 		const char *Salt;
 		const char *SessionChallenge;
+		bool WSServerEnabled;
 		QUrl WSServerUrl;
 		bool SettingsLoaded;
 		

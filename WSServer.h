@@ -28,6 +28,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QTimer>
 #include <QAbstractSocket>
 
+#include <obs-data.h>
+
 QT_FORWARD_DECLARE_CLASS(QWebSocketServer)
 QT_FORWARD_DECLARE_CLASS(QWebSocket)
 
@@ -56,10 +58,11 @@ class WSServer : public QObject
 		void broadcast(QString message);
 		void ConnectToServer(QUrl url);
 		void DisconnectFromServer();
-		QWebSocket* GetRemoteControlWebSocket();
+		QString GetRemoteControlServerError();
 		WSRemoteControlServerStatus GetRemoteControlServerStatus();
+		QUrl GetRemoteControlServerUrl();
+		obs_data_t* GetRemoteControlServerData();
 		static WSServer* Instance;
-	
 
 	private Q_SLOTS:
 		void onNewConnection();
@@ -83,6 +86,7 @@ class WSServer : public QObject
 		QTimer* _reconnectTimer;
 		WSRemoteControlServerStatus _currentStatus;
 		qreal _reconnectCount;
+		QString _lastRemoteError;
 };
 
 #endif // WSSERVER_H

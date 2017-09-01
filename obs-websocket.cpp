@@ -47,9 +47,11 @@ bool obs_module_load(void)
 	if (config->ServerEnabled) 
 	{
 		WSServer::Instance->Start(config->ServerPort);
-		if (!config->WSServerUrl.isEmpty() && config->WSServerUrl.isValid()) {
-			WSServer::Instance->ConnectToServer(config->WSServerUrl);
-		}
+	}
+	
+	if (config->WSServerEnabled && !config->WSServerUrl.isEmpty() && config->WSServerUrl.isValid())
+	{
+		WSServer::Instance->ConnectToServer(config->WSServerUrl);
 	}
 
 	// UI setup

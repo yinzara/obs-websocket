@@ -58,6 +58,7 @@ void SettingsDialog::showEvent(QShowEvent* event)
 
 	ui->authRequired->setChecked(conf->AuthRequired);
 	ui->password->setText(CHANGE_ME);
+	ui->serverEnabled->setChecked(conf->WSServerEnabled);
 	
 	if (!conf->WSServerUrl.isEmpty())
 		ui->serverUrl->setText(conf->WSServerUrl.toString());
@@ -71,7 +72,7 @@ void SettingsDialog::ServerUrlChanged(QString newUrl)
 		newUrl = ui->serverUrl->text();
 	
 	QPushButton * okButton = ui->buttonBox->button(QDialogButtonBox::Ok);
-	if (newUrl == Q_NULLPTR || newUrl.isEmpty() || QStringLiteral("ws://") == newUrl)
+	if (!ui->remoteServerEnabled->isChecked() || newUrl == Q_NULLPTR || newUrl.isEmpty() || QStringLiteral("ws://") == newUrl)
 	{
 		okButton->setEnabled(true); //empty url is valid
 	}
@@ -101,6 +102,14 @@ void SettingsDialog::ToggleShowHide()
 		setVisible(false);
 }
 
+void SettingsDialog::RemoteServerEnabledChanged()
+{
+	if (ui->remoteServerEnabled->isChecked())
+		ui->serverUrl->setEnabled(true);
+	else
+		ui->serverUrl->setEnabled(false);
+}
+
 void SettingsDialog::AuthCheckboxChanged()
 {
 	if (ui->authRequired->isChecked())
@@ -117,6 +126,8 @@ void SettingsDialog::FormAccepted()
 	conf->ServerPort = ui->serverPort->value();
 	
 	conf->DebugEnabled = ui->debugEnabled->isChecked();
+	
+	conf->WSServerEnabled = ui->remoteServerEnabled->isChecked();
 	
 	conf->WSServerUrl = ui->serverUrl->text().length() > 5 ? QUrl(ui->serverUrl->text()) : QUrl(QStringLiteral(""));
 
@@ -141,22 +152,16 @@ void SettingsDialog::FormAccepted()
 	}
 
 	conf->Save();
+	
+	if (conf->WSServerEnabled && !conf->WSServerUrl.isEmpty() && conf->WSServerUrl.isValid())
+		WSServer::Instance->ConnectToServer(conf->WSServerUrl);
+	else
+		WSServer::Instance->DisconnectFromServer();
 
 	if (conf->ServerEnabled)
-	{
 		WSServer::Instance->Start(conf->ServerPort);
-		if (!conf->WSServerUrl.isEmpty() && conf->WSServerUrl.isValid())
-		{
-			WSServer::Instance->ConnectToServer(conf->WSServerUrl);
-		}
-		else
-			WSServer::Instance->DisconnectFromServer();
-	}
 	else
-	{
 		WSServer::Instance->Stop();
-		WSServer::Instance->DisconnectFromServer();
-	}
 }
 
 SettingsDialog::~SettingsDialog()

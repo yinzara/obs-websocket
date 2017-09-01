@@ -31,6 +31,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #define PARAM_AUTHREQUIRED "AuthRequired"
 #define PARAM_SECRET "AuthSecret"
 #define PARAM_SALT "AuthSalt"
+#define PARAM_WS_SERVER_ENABLE "WSSeverEnable"
 #define PARAM_WS_SERVER_URL "WSServerUrl"
 
 Config *Config::_instance = new Config();
@@ -48,6 +49,7 @@ Config::Config()
 	Salt = "";
 	SettingsLoaded = false;
 	WSServerUrl = QUrl(QString(Salt));
+	WSServerEnabled = false;
 
 	// OBS Config defaults
 	config_t* obs_config = obs_frontend_get_global_config();
@@ -70,6 +72,9 @@ Config::Config()
 
 		config_set_default_string(obs_config,
 			SECTION_NAME, PARAM_WS_SERVER_URL, "");
+		
+		config_set_default_bool(obs_config,
+			SECTION_NAME, PARAM_WS_SERVER_ENABLE, WSServerEnabled);
 	}
 
 	mbedtls_entropy_init(&entropy);
@@ -100,6 +105,7 @@ void Config::Load()
 	Salt = config_get_string(obs_config, SECTION_NAME, PARAM_SALT);
 
 	WSServerUrl = QUrl(QString(config_get_string(obs_config, SECTION_NAME, PARAM_WS_SERVER_URL)));
+	WSServerEnabled = config_get_bool(obs_config, SECTION_NAME, PARAM_WS_SERVER_ENABLE);
 }
 
 void Config::Save()
@@ -115,7 +121,8 @@ void Config::Save()
 	config_set_string(obs_config, SECTION_NAME, PARAM_SECRET, Secret);
 	config_set_string(obs_config, SECTION_NAME, PARAM_SALT, Salt);
 	config_set_string(obs_config, SECTION_NAME, PARAM_WS_SERVER_URL, WSServerUrl.toString().toUtf8().constData());
-
+	config_set_bool(obs_config, SECTION_NAME, PARAM_WS_SERVER_ENABLE, WSServerEnabled);
+	
 	config_save(obs_config);
 }
 

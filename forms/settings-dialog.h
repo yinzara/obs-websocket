@@ -39,6 +39,7 @@ private Q_SLOTS:
 	void AuthCheckboxChanged();
 	void FormAccepted();
 	void ServerUrlChanged(QString newUrl);
+	void RemoteServerEnabledChanged();
 
 private:
 	Ui::SettingsDialog* ui;
