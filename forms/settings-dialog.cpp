@@ -58,7 +58,7 @@ void SettingsDialog::showEvent(QShowEvent* event)
 
 	ui->authRequired->setChecked(conf->AuthRequired);
 	ui->password->setText(CHANGE_ME);
-	ui->serverEnabled->setChecked(conf->WSServerEnabled);
+	ui->remoteServerEnabled->setChecked(conf->WSServerEnabled);
 	
 	if (!conf->WSServerUrl.isEmpty())
 		ui->serverUrl->setText(conf->WSServerUrl.toString());
