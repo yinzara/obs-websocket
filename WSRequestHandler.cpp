@@ -278,10 +278,11 @@ void WSRequestHandler::HandleGetWebSocketSettings(WSRequestHandler *req)
 {
 	Config* config = Config::Current();
 	obs_data_t* response = obs_data_create();
-	obs_data_set_bool(response, "enable_local_server", config->ServerEnabled);
+	obs_data_set_bool(response, "local_server_enabled", config->ServerEnabled);
 	obs_data_set_int(response, "local_server_port", config->ServerPort);
-	obs_data_set_bool(response, "enable_remote_server", config->WSServerEnabled);
+	obs_data_set_bool(response, "remote_server_enabled", config->WSServerEnabled);
 	obs_data_set_string(response, "remote_server_url", config->WSServerUrl.toString().toUtf8().constData());
+	obs_data_set_bool(response, "auth_enabled", config->AuthRequired);
 	
 	req->SendResponse(response);
 	obs_data_release(response);
