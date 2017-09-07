@@ -18,6 +18,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <mbedtls/base64.h>
 #include <mbedtls/sha256.h>
+#include <mbedtls/pkcs5.h>
 #include <obs-frontend-api.h>
 #include <util/config-file.h>
 #include <string>
@@ -162,7 +163,6 @@ const char* Config::GenerateSecret(const char *password, const char *salt)
 	mbedtls_base64_encode(
 		(unsigned char*)challenge, 64, &challenge_bytes,
 		challengeHash, 32);
-
 	bfree(challengeHash);
 	return challenge;
 }

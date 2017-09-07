@@ -150,6 +150,14 @@ void WSServer::broadcast(QString message)
 	_clMutex.unlock();
 }
 
+QString WSServer::GetLocalHostname()
+{
+	QString localHostname = QProcessEnvironment::systemEnvironment().value(WS_HOSTNAME_ENV_VARIABLE, QHostInfo::localHostName());
+	if (localHostname.indexOf('.') > 0)
+		localHostname = localHostname.left(localHostname.indexOf('.'));
+	return localHostname;
+}
+
 void WSServer::ConnectToServer(QUrl url)
 {
 	if (_serverUrl == url && _serverConnection != Q_NULLPTR && _serverConnection->state() == QAbstractSocket::SocketState::ConnectedState)
@@ -241,7 +249,7 @@ void WSServer::onServerConnection()
 		
 		obs_data_t* connectMsg = obs_data_create();
 		obs_data_set_string(connectMsg, "update-type", "ClientConnected");
-		obs_data_set_string(connectMsg, "hostname", QProcessEnvironment::systemEnvironment().value(WS_HOSTNAME_ENV_VARIABLE, QHostInfo::localHostName()).toUtf8().constData());
+		obs_data_set_string(connectMsg, "hostname", GetLocalHostname().toUtf8().constData());
 		
 		obs_service_t* service = obs_frontend_get_streaming_service();
 		obs_data_t* settings = obs_service_get_settings(service);

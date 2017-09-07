@@ -61,6 +61,7 @@ class WSServer : public QObject
 		QString GetRemoteControlServerError();
 		WSRemoteControlServerStatus GetRemoteControlServerStatus();
 		QUrl GetRemoteControlServerUrl();
+		QString GetLocalHostname();
 		obs_data_t* GetRemoteControlServerData();
 		static WSServer* Instance;
 

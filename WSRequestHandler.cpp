@@ -25,6 +25,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "Utils.h"
 #include <QProcessEnvironment>
 #include <qstring.h>
+#include <QHostInfo>
+
+#define WS_HOSTNAME_ENV_VARIABLE QStringLiteral("WS_HOSTNAME")
 
 bool str_valid(const char* str)
 {
@@ -44,8 +47,10 @@ WSRequestHandler::WSRequestHandler(QWebSocket* client) :
 	messageMap["GetVersion"] = WSRequestHandler::HandleGetVersion;
 	messageMap["GetAuthRequired"] = WSRequestHandler::HandleGetAuthRequired;
 	messageMap["Authenticate"] = WSRequestHandler::HandleAuthenticate;
-	messageMap["SetAuthInfo"] = WSRequestHandler::HandleSetAuthInfo;
-
+	
+	messageMap["GetWebSocketSettings"] = WSRequestHandler::HandleGetWebSocketSettings;
+	messageMap["SetWebSocketSettings"] = WSRequestHandler::HandleSetWebSocketSettings;
+	
 	messageMap["SetCurrentScene"] = WSRequestHandler::HandleSetCurrentScene;
 	messageMap["GetCurrentScene"] = WSRequestHandler::HandleGetCurrentScene;
 	messageMap["GetSceneList"] = WSRequestHandler::HandleGetSceneList;
@@ -227,7 +232,8 @@ void WSRequestHandler::HandleGetAuthRequired(WSRequestHandler* req)
 
 	obs_data_t* data = obs_data_create();
 	obs_data_set_bool(data, "authRequired", authRequired);
-
+	obs_data_set_string(data, "hostname", WSServer::Instance->GetLocalHostname().toUtf8().constData());
+	
 	if (authRequired)
 	{
 		obs_data_set_string(data, "challenge",
@@ -268,34 +274,112 @@ void WSRequestHandler::HandleAuthenticate(WSRequestHandler* req)
 	}
 }
 
-void WSRequestHandler::HandleSetAuthInfo(WSRequestHandler *req)
+void WSRequestHandler::HandleGetWebSocketSettings(WSRequestHandler *req)
 {
-	if (!req->hasField("auth"))
+	Config* config = Config::Current();
+	obs_data_t* response = obs_data_create();
+	obs_data_set_bool(response, "enable_local_server", config->ServerEnabled);
+	obs_data_set_int(response, "local_server_port", config->ServerPort);
+	obs_data_set_bool(response, "enable_remote_server", config->WSServerEnabled);
+	obs_data_set_string(response, "remote_server_url", config->WSServerUrl.toString().toUtf8().constData());
+	
+	req->SendResponse(response);
+	obs_data_release(response);
+}
+
+void WSRequestHandler::HandleSetWebSocketSettings(WSRequestHandler *req)
+{
+	if (!req->hasField("auth") && !req->hasField("local_server_enabled") && !req->hasField("remote_server_enabled") && !req->hasField("auth_enabled") && !req->hasField("remote_server_url") && !req->hasField("local_server_port"))
 	{
-		req->SendErrorResponse("missing request parameters");
+		req->SendErrorResponse("missing request parameters (one or more): local_server_enabled, remote_server_enabled, enable_auth, remote_server_url, local_server_url");
 		return;
 	}
+	
+	Config* config = Config::Current();
 	
 	const char* auth = obs_data_get_string(req->data, "auth");
-	if (!str_valid(auth))
+	if (str_valid(auth))
 	{
-		req->SendErrorResponse("auth not specified!");
-		return;
-	}
-	
-	if (req->_client->property(PROP_AUTHENTICATED).toBool())
-	{
-		Config* config = Config::Current();
 		config->AuthRequired = true;
 		config->SetPassword(auth);
-		config->Save();
-		
-		req->SendOKResponse();
 	}
-	else
+	else if (req->hasField("auth_enabled") && !obs_data_get_bool(req->data, "auth_enabled"))
 	{
-		req->SendErrorResponse("Cannot set auth details if not authenticated.");
+		config->AuthRequired = false;
 	}
+	
+	bool restartLocalServer = false;
+	if (req->hasField("local_server_enabled"))
+	{
+		bool enabled = obs_data_get_bool(req->data, "local_server_enabled");
+		if (enabled != config->ServerEnabled)
+		{
+			config->ServerEnabled = enabled;
+			restartLocalServer = true;
+		}
+	}
+	if (req->hasField("local_server_port"))
+	{
+		int port = obs_data_get_int(req->data, "local_server_port");
+		if (port > 0 && (uint64_t) port != config->ServerPort)
+		{
+			config->ServerPort = obs_data_get_int(req->data, "local_server_port");
+			restartLocalServer = true;
+		}
+	}
+	
+	bool restartRemoteServer = false;
+	if (req->hasField("remote_server_enabled"))
+	{
+		bool enabled = obs_data_get_bool(req->data, "remote_server_enabled");
+		if (enabled != config->WSServerEnabled)
+		{
+			config->WSServerEnabled = enabled;
+			restartRemoteServer = true;
+		}
+	}
+	if (req->hasField("remote_server_url"))
+	{
+		QUrl url = QUrl(QString(obs_data_get_string(req->data, "remote_server_url")));
+		if (url.isValid())
+		{
+			if (url != config->WSServerUrl)
+			{
+				config->WSServerUrl = url;
+				restartRemoteServer = true;
+			}
+		}
+		else
+		{
+			req->SendErrorResponse("'remote_server_url' was invalid");
+			return;
+		}
+	}
+	
+	if (restartLocalServer)
+	{
+		WSServer::Instance->Stop();
+		if (config->ServerEnabled)
+		{
+			WSServer::Instance->Start(config->ServerPort);
+		}
+	}
+	
+	if (restartRemoteServer)
+	{
+		WSServer::Instance->DisconnectFromServer();
+		if (config->WSServerEnabled)
+		{
+			WSServer::Instance->ConnectToServer(config->WSServerUrl);
+		}
+	}
+	
+	if (obs_data_get_bool(req->data, "save"))
+	{
+		config->Save();
+	}
+	
+	req->SendOKResponse();
 }
 
 void WSRequestHandler::HandleSetCurrentScene(WSRequestHandler* req)
