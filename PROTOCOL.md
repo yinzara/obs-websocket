@@ -367,6 +367,7 @@ __Response__ : always OK, with these additional fields :
 - **"authRequired"** (bool)
 - **"challenge"** (string)
 - **"salt"** (string)
+- **"hostname"** (string) : the configured hostname of the workstation running OBS Studio.  Can be overridden with the WS_HOSTNAME environment variable on the workstation
 
 ---
 
