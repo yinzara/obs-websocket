@@ -44,6 +44,8 @@ The protocol in general is based on the OBS Remote protocol created by Bill Hami
       - ["RecordingStarted"](#recordingstarted)
       - ["RecordingStopping"](#recordingstopping)
       - ["RecordingStopped"](#recordingstopped)
+    - **Remote Control Server**
+      - ["RemoteControlServerStateChange"](#remotecontrolserverstatechange)
     - **Other**
       - ["Exiting"](#exiting)
 * [Requests](#requests)
@@ -53,6 +55,9 @@ The protocol in general is based on the OBS Remote protocol created by Bill Hami
       - ["GetVersion"](#getversion)
       - ["GetAuthRequired"](#getauthrequired)
       - ["Authenticate"](#authenticate)
+    - **WebSocket Settings**
+      - ["GetWebSocketSettings"](#getwebsocketsettings)
+      - ["SetWebSocketSettings"](#setwebsocketsettings)
     - **Scenes**
       - ["GetCurrentScene"](#getcurrentscene)
       - ["SetCurrentScene"](#setcurrentscene)
@@ -112,6 +117,10 @@ The protocol in general is based on the OBS Remote protocol created by Bill Hami
       - ["ListProfiles"](#listprofiles)
       - ["SetCurrentProfile"](#setcurrentprofile)
       - ["GetCurrentProfile"](#getcurrentprofile)
+    - **Remote Control Server**
+      - ["GetRemoteControlServerStatus"](#getremotecontrolserverstatus)
+      - ["ConnectToRemoteControlServer"](#connecttoremotecontrolserver)
+      - ["DisconnectFromRemoteControlServer"](#disconnectfromremotecontrolserver")
 
 ## Authentication
 A call to [`GetAuthRequired`](#getauthrequired) gives the client two elements :
@@ -294,6 +303,14 @@ Recording stopped successfully.
 
 ---
 
+#### "RemoteControlServerStateChange"  
+The status of the connection to the remote control server has changed
+- **"status"** (string) : Either "CONNECTING", "CONNECTED", "ERROR", or "DISCONNETED"
+- **"url"** (string) : The URL of the current connection
+- **"error"** (string) : Only present if an error has occurred. A string describing this error.
+
+---
+
 #### "StreamStatus"
 Sent every 2 seconds with the following information :  
 - **streaming** (bool) : Current Streaming state.
@@ -360,6 +377,34 @@ __Request fields__ :
 - **"auth"** (string) : response to the auth challenge (see "Authentication").
 
 __Response__ : OK if auth succeeded, error if invalid credentials. No additional fields.
+
+---
+
+#### "GetWebSocketSettings"
+Get the current OBS WebSocket plugin settings
+
+__Request fields__ : none  
+__Response__ : always OK, with these additional fields :  
+- **"remote_server_enabled"** (bool) : Enable remote control server connection
+- **"remote_server_url"** (string) : WebSocket URL (should start with ws:// or wss://) for remote control conection
+- **"local_server_enabled"** (bool) : Enable local OBS WebSocket server
+- **"local_server_port"** (integer) : Port to listen for incoming connections for local WebSocket server
+- **"auth_enabled"** (bool) : Is authentication required for incoming local server connections?
+
+---
+
+#### "SetWebSocketSettings"
+Sets the current OBS WebSocket plugin settings
+
+__Request fields__ : 
+- **"remote_server_enabled"** (bool) : Enable remote control server connection
+- **"remote_server_url"** (string) : WebSocket URL (should start with ws:// or wss://) for remote control conection
+- **"local_server_enabled"** (bool) : Enable local OBS WebSocket server
+- **"local_server_port"** (integer) : Port to listen for incoming connections for local WebSocket server
+- **"auth_enabled"** (bool) : Is authentication required for incoming local server connections?
+- **"auth"** (string) : Sets the password for local WebSocket authentication
+- **"save"** (bool) : If present and specified as true, saves settings to disk. Otherwise settings are only for the current process.
+__Response__ : always OK if settings applied correctly, error if they weren't. No additional fields.
 
 ---
 
@@ -832,6 +877,36 @@ __Request fields__ : none
 
 __Response__ : OK with these additional fields :
 - **"profile-name"** (string) : name of the current profile
+
+---
+
+#### "GetRemoteControlServerStatus"
+Gets the current status of the remote control server connection
+__Request fields__ : none
+
+__Response__ : OK with the additional fields :
+- **"status"** (string) : Either "CONNECTING", "CONNECTED", "ERROR", or "DISCONNETED"
+- **"url"** (string) : The URL of the current connection
+- **"error"** (string) : Only present if an error has occurred. A string describing this error.
+
+---
+
+#### "ConnectToRemoteControlServer"
+Change the current profile.
+
+__Request fields__ :
+- **"url"** (string) : name of the desired profile
+- **"save"** (bool) : If specified as true, saves the current connection URL to disk to reconnect if OBS crashes otherwise only affects current process.
+__Response__ : OK if profile exists, error otherwise.
+
+---
+
+#### "DisconnectFromRemoteControlServer"
+Get the name of the current profile.
+
+__Request fields__ : none
+
+__Response__ : OK always otherwise error if the was no current remote control server connection or it was already disconnected.
 
 ---
 
