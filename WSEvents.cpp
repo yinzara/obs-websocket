@@ -68,10 +68,14 @@ WSEvents::WSEvents(WSServer* srv)
 	connect(duration_control, SIGNAL(valueChanged(int)),
 		this, SLOT(TransitionDurationChanged(int)));
 
-	QTimer* statusTimer = new QTimer();
-	connect(statusTimer, &QTimer::timeout,
-			this, &WSEvents::StreamStatus);
-	statusTimer->start(2000); // equal to frontend's constant BITRATE_UPDATE_SECONDS
+	int statusInterval = Config::Current()->StatusUpdateIntervalSec * 1000;
+	if (statusInterval > 0)
+	{
+		_statusTimer = new QTimer();
+		connect(_statusTimer, &QTimer::timeout,
+				this, &WSEvents::StreamStatus);
+		_statusTimer->start(statusInterval);
+	}
 
 	QListWidget* sceneList = Utils::GetSceneListControl();
 	connect(sceneList, &QListWidget::currentItemChanged,
@@ -96,6 +100,27 @@ WSEvents::WSEvents(WSServer* srv)
 WSEvents::~WSEvents()
 {
 	obs_frontend_remove_event_callback(WSEvents::FrontendEventHandler, this);
+}
+
+void WSEvents::SetStatusInterval(int secs)
+{
+	if (secs > 0)
+	{
+		if (_statusTimer != nullptr)
+			_statusTimer->setInterval(secs * 1000);
+		else
+		{
+			_statusTimer = new QTimer();
+			connect(_statusTimer, &QTimer::timeout,
+					this, &WSEvents::StreamStatus);
+			_statusTimer->start(secs * 1000);
+		}
+	}
+	else
+	{
+		_statusTimer->stop();
+		_statusTimer = nullptr;
+	}
 }
 
 void WSEvents::deferredInitOperations()

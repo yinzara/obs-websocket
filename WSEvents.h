@@ -43,7 +43,7 @@ class WSEvents : public QObject
 		const char* GetRecordingTimecode();
 	
 		void OnRemoteControlServerStateChange();
-
+		void SetStatusInterval(int secs);
 
 	private Q_SLOTS:
 		void deferredInitOperations();
@@ -66,6 +66,8 @@ class WSEvents : public QObject
 
 		uint64_t _lastBytesSent;
 		uint64_t _lastBytesSentTime;
+	
+		QTimer* _statusTimer;
 
 		void broadcastUpdate(const char* updateType,
 			obs_data_t* additionalFields);

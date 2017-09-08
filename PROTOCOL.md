@@ -390,6 +390,7 @@ __Response__ : always OK, with these additional fields :
 - **"remote_server_url"** (string) : WebSocket URL (should start with ws:// or wss://) for remote control conection
 - **"local_server_enabled"** (bool) : Enable local OBS WebSocket server
 - **"local_server_port"** (integer) : Port to listen for incoming connections for local WebSocket server
+- **"status_interval_secs"** (integer) : When streaming/recording, the number of sections between status updates are sent to connected websocket clients
 - **"auth_enabled"** (bool) : Is authentication required for incoming local server connections?
 
 ---
@@ -402,6 +403,7 @@ __Request fields__ :
 - **"remote_server_url"** (string) : WebSocket URL (should start with ws:// or wss://) for remote control conection
 - **"local_server_enabled"** (bool) : Enable local OBS WebSocket server
 - **"local_server_port"** (integer) : Port to listen for incoming connections for local WebSocket server
+- **"status_interval_secs"** (integer) : When streaming/recording, the number of sections between status updates are sent to connected websocket clients
 - **"auth_enabled"** (bool) : Is authentication required for incoming local server connections?
 - **"auth"** (string) : Sets the password for local WebSocket authentication
 - **"save"** (bool) : If present and specified as true, saves settings to disk. Otherwise settings are only for the current process.

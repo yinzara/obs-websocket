@@ -34,6 +34,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #define PARAM_SALT "AuthSalt"
 #define PARAM_WS_SERVER_ENABLE "WSSeverEnable"
 #define PARAM_WS_SERVER_URL "WSServerUrl"
+#define PARAM_STATUS_INTERVAL "StatusInterval"
 
 Config *Config::_instance = new Config();
 
@@ -51,6 +52,8 @@ Config::Config()
 	SettingsLoaded = false;
 	WSServerUrl = QUrl(QString(Salt));
 	WSServerEnabled = false;
+	
+	StatusUpdateIntervalSec = 2;
 
 	// OBS Config defaults
 	config_t* obs_config = obs_frontend_get_global_config();
@@ -76,6 +79,9 @@ Config::Config()
 		
 		config_set_default_bool(obs_config,
 			SECTION_NAME, PARAM_WS_SERVER_ENABLE, WSServerEnabled);
+		
+		config_set_default_int(obs_config,
+			SECTION_NAME, PARAM_STATUS_INTERVAL, StatusUpdateIntervalSec);
 	}
 
 	mbedtls_entropy_init(&entropy);
@@ -107,6 +113,8 @@ void Config::Load()
 
 	WSServerUrl = QUrl(QString(config_get_string(obs_config, SECTION_NAME, PARAM_WS_SERVER_URL)));
 	WSServerEnabled = config_get_bool(obs_config, SECTION_NAME, PARAM_WS_SERVER_ENABLE);
+	
+	StatusUpdateIntervalSec = config_get_int(obs_config, SECTION_NAME, PARAM_STATUS_INTERVAL);
 }
 
 void Config::Save()
@@ -123,6 +131,7 @@ void Config::Save()
 	config_set_string(obs_config, SECTION_NAME, PARAM_SALT, Salt);
 	config_set_string(obs_config, SECTION_NAME, PARAM_WS_SERVER_URL, WSServerUrl.toString().toUtf8().constData());
 	config_set_bool(obs_config, SECTION_NAME, PARAM_WS_SERVER_ENABLE, WSServerEnabled);
+	config_set_int(obs_config, SECTION_NAME, PARAM_STATUS_INTERVAL, StatusUpdateIntervalSec);
 	
 	config_save(obs_config);
 }

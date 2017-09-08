@@ -283,6 +283,7 @@ void WSRequestHandler::HandleGetWebSocketSettings(WSRequestHandler *req)
 	obs_data_set_bool(response, "remote_server_enabled", config->WSServerEnabled);
 	obs_data_set_string(response, "remote_server_url", config->WSServerUrl.toString().toUtf8().constData());
 	obs_data_set_bool(response, "auth_enabled", config->AuthRequired);
+	obs_data_set_int(response, "status_interval_secs", config->StatusUpdateIntervalSec);
 	
 	req->SendResponse(response);
 	obs_data_release(response);
@@ -372,6 +373,16 @@ void WSRequestHandler::HandleSetWebSocketSettings(WSRequestHandler *req)
 		if (config->WSServerEnabled)
 		{
 			WSServer::Instance->ConnectToServer(config->WSServerUrl);
+		}
+	}
+	
+	if (req->hasField("status_interval_secs"))
+	{
+		int statusIntervalSecs = obs_data_get_int(req->data, "status_interval_secs");
+		if (statusIntervalSecs != config->StatusUpdateIntervalSec)
+		{
+			config->StatusUpdateIntervalSec = statusIntervalSecs;
+			WSEvents::Instance->SetStatusInterval(statusIntervalSecs);
 		}
 	}
 	

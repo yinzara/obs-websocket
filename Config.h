@@ -44,6 +44,8 @@ class Config
 		bool DebugEnabled;
 
 		bool AuthRequired;
+	
+		int StatusUpdateIntervalSec;
 		const char *Secret;
 		const char *Salt;
 		const char *SessionChallenge;
