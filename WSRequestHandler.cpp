@@ -37,87 +37,92 @@ bool str_valid(const char* str)
 
 obs_service_t* WSRequestHandler::_service = nullptr;
 
+QMap<QString, void(*)(WSRequestHandler*)> WSRequestHandler::messageMap {
+	{"GetVersion", WSRequestHandler::HandleGetVersion},
+	{"GetAuthRequired", WSRequestHandler::HandleGetAuthRequired},
+	{"Authenticate", WSRequestHandler::HandleAuthenticate},
+	
+	{"GetWebSocketSettings", WSRequestHandler::HandleGetWebSocketSettings},
+	{"SetWebSocketSettings", WSRequestHandler::HandleSetWebSocketSettings},
+	
+	{"SetCurrentScene", WSRequestHandler::HandleSetCurrentScene},
+	{"GetCurrentScene", WSRequestHandler::HandleGetCurrentScene},
+	{"GetSceneList", WSRequestHandler::HandleGetSceneList},
+	
+	{"SetSourceRender", WSRequestHandler::HandleSetSceneItemRender}, // Retrocompat
+	{"SetSceneItemRender", WSRequestHandler::HandleSetSceneItemRender},
+	{"SetSceneItemPosition", WSRequestHandler::HandleSetSceneItemPosition},
+	{"SetSceneItemTransform", WSRequestHandler::HandleSetSceneItemTransform},
+	{"SetSceneItemCrop", WSRequestHandler::HandleSetSceneItemCrop},
+	
+	{"GetStreamingStatus", WSRequestHandler::HandleGetStreamingStatus},
+	{"StartStopStreaming", WSRequestHandler::HandleStartStopStreaming},
+	{"StartStopRecording", WSRequestHandler::HandleStartStopRecording},
+	{"StartStreaming", WSRequestHandler::HandleStartStreaming},
+	{"StopStreaming", WSRequestHandler::HandleStopStreaming},
+	{"StartRecording", WSRequestHandler::HandleStartRecording},
+	{"StopRecording", WSRequestHandler::HandleStopRecording},
+	
+	{"SetRecordingFolder", WSRequestHandler::HandleSetRecordingFolder},
+	{"GetRecordingFolder", WSRequestHandler::HandleGetRecordingFolder},
+	
+	{"GetTransitionList", WSRequestHandler::HandleGetTransitionList},
+	{"GetCurrentTransition", WSRequestHandler::HandleGetCurrentTransition},
+	{"SetCurrentTransition", WSRequestHandler::HandleSetCurrentTransition},
+	{"SetTransitionDuration", WSRequestHandler::HandleSetTransitionDuration},
+	{"GetTransitionDuration", WSRequestHandler::HandleGetTransitionDuration},
+	
+	{"SetVolume", WSRequestHandler::HandleSetVolume},
+	{"GetVolume", WSRequestHandler::HandleGetVolume},
+	{"ToggleMute", WSRequestHandler::HandleToggleMute},
+	{"SetMute", WSRequestHandler::HandleSetMute},
+	{"GetMute", WSRequestHandler::HandleGetMute},
+	{"GetSpecialSources", WSRequestHandler::HandleGetSpecialSources},
+	
+	{"SetCurrentSceneCollection", WSRequestHandler::HandleSetCurrentSceneCollection},
+	{"GetCurrentSceneCollection", WSRequestHandler::HandleGetCurrentSceneCollection},
+	{"ListSceneCollections", WSRequestHandler::HandleListSceneCollections},
+	
+	{"SetCurrentProfile", WSRequestHandler::HandleSetCurrentProfile},
+	{"GetCurrentProfile", WSRequestHandler::HandleGetCurrentProfile},
+	{"ListProfiles", WSRequestHandler::HandleListProfiles},
+	
+	{"SetStreamSettings", WSRequestHandler::HandleSetStreamSettings},
+	{"GetStreamSettings", WSRequestHandler::HandleGetStreamSettings},
+	{"SaveStreamSettings", WSRequestHandler::HandleSaveStreamSettings},
+	
+	{"GetStudioModeStatus", WSRequestHandler::HandleGetStudioModeStatus},
+	{"GetPreviewScene", WSRequestHandler::HandleGetPreviewScene},
+	{"SetPreviewScene", WSRequestHandler::HandleSetPreviewScene},
+	{"TransitionToProgram", WSRequestHandler::HandleTransitionToProgram},
+	{"EnableStudioMode", WSRequestHandler::HandleEnableStudioMode},
+	{"DisableStudioMode", WSRequestHandler::HandleDisableStudioMode},
+	{"ToggleStudioMode", WSRequestHandler::HandleToggleStudioMode},
+	
+	{"SetTextGDIPlusProperties", WSRequestHandler::HandleSetTextGDIPlusProperties},
+	{"GetTextGDIPlusProperties", WSRequestHandler::HandleGetTextGDIPlusProperties},
+	
+	{"GetBrowserSourceProperties", WSRequestHandler::HandleGetBrowserSourceProperties},
+	{"SetBrowserSourceProperties", WSRequestHandler::HandleSetBrowserSourceProperties},
+	
+	{"GetRemoteControlServerStatus", WSRequestHandler::HandleGetRemoteControlServerStatus},
+	{"ConnectToRemoteControlServer", WSRequestHandler::HandleConnectToRemoteControlServer},
+	{"DisconnectFromRemoteControlServer", WSRequestHandler::HandleDisconnectFromRemoteControlServer}
+};
+
+QSet<QString> WSRequestHandler::authNotRequired {
+	"GetVersion",
+	"GetAuthRequired",
+	"Authenticate",
+	"GetRemoteControlServerStatus"
+};
+
 WSRequestHandler::WSRequestHandler(QWebSocket* client) :
+	_client(client),
 	_messageId(0),
 	_requestType(""),
 	data(nullptr)
 {
-	_client = client;
-
-	messageMap["GetVersion"] = WSRequestHandler::HandleGetVersion;
-	messageMap["GetAuthRequired"] = WSRequestHandler::HandleGetAuthRequired;
-	messageMap["Authenticate"] = WSRequestHandler::HandleAuthenticate;
-	
-	messageMap["GetWebSocketSettings"] = WSRequestHandler::HandleGetWebSocketSettings;
-	messageMap["SetWebSocketSettings"] = WSRequestHandler::HandleSetWebSocketSettings;
-	
-	messageMap["SetCurrentScene"] = WSRequestHandler::HandleSetCurrentScene;
-	messageMap["GetCurrentScene"] = WSRequestHandler::HandleGetCurrentScene;
-	messageMap["GetSceneList"] = WSRequestHandler::HandleGetSceneList;
-
-	messageMap["SetSourceRender"] = WSRequestHandler::HandleSetSceneItemRender; // Retrocompat
-	messageMap["SetSceneItemRender"] = WSRequestHandler::HandleSetSceneItemRender;
-	messageMap["SetSceneItemPosition"] = WSRequestHandler::HandleSetSceneItemPosition;
-	messageMap["SetSceneItemTransform"] = WSRequestHandler::HandleSetSceneItemTransform;
-	messageMap["SetSceneItemCrop"] = WSRequestHandler::HandleSetSceneItemCrop;
-
-	messageMap["GetStreamingStatus"] = WSRequestHandler::HandleGetStreamingStatus;
-	messageMap["StartStopStreaming"] = WSRequestHandler::HandleStartStopStreaming;
-	messageMap["StartStopRecording"] = WSRequestHandler::HandleStartStopRecording;
-	messageMap["StartStreaming"] = WSRequestHandler::HandleStartStreaming;
-	messageMap["StopStreaming"] = WSRequestHandler::HandleStopStreaming;
-	messageMap["StartRecording"] = WSRequestHandler::HandleStartRecording;
-	messageMap["StopRecording"] = WSRequestHandler::HandleStopRecording;
-
-	messageMap["SetRecordingFolder"] = WSRequestHandler::HandleSetRecordingFolder;
-	messageMap["GetRecordingFolder"] = WSRequestHandler::HandleGetRecordingFolder;
-
-	messageMap["GetTransitionList"] = WSRequestHandler::HandleGetTransitionList;
-	messageMap["GetCurrentTransition"] = WSRequestHandler::HandleGetCurrentTransition;
-	messageMap["SetCurrentTransition"] = WSRequestHandler::HandleSetCurrentTransition;
-	messageMap["SetTransitionDuration"] = WSRequestHandler::HandleSetTransitionDuration;
-	messageMap["GetTransitionDuration"] = WSRequestHandler::HandleGetTransitionDuration;
-
-	messageMap["SetVolume"] = WSRequestHandler::HandleSetVolume;
-	messageMap["GetVolume"] = WSRequestHandler::HandleGetVolume;
-	messageMap["ToggleMute"] = WSRequestHandler::HandleToggleMute;
-	messageMap["SetMute"] = WSRequestHandler::HandleSetMute;
-	messageMap["GetMute"] = WSRequestHandler::HandleGetMute;
-	messageMap["GetSpecialSources"] = WSRequestHandler::HandleGetSpecialSources;
-
-	messageMap["SetCurrentSceneCollection"] = WSRequestHandler::HandleSetCurrentSceneCollection;
-	messageMap["GetCurrentSceneCollection"] = WSRequestHandler::HandleGetCurrentSceneCollection;
-	messageMap["ListSceneCollections"] = WSRequestHandler::HandleListSceneCollections;
-
-	messageMap["SetCurrentProfile"] = WSRequestHandler::HandleSetCurrentProfile;
-	messageMap["GetCurrentProfile"] = WSRequestHandler::HandleGetCurrentProfile;
-	messageMap["ListProfiles"] = WSRequestHandler::HandleListProfiles;
-
-	messageMap["SetStreamSettings"] = WSRequestHandler::HandleSetStreamSettings;
-	messageMap["GetStreamSettings"] = WSRequestHandler::HandleGetStreamSettings;
-	messageMap["SaveStreamSettings"] = WSRequestHandler::HandleSaveStreamSettings;
-
-	messageMap["GetStudioModeStatus"] = WSRequestHandler::HandleGetStudioModeStatus;
-	messageMap["GetPreviewScene"] = WSRequestHandler::HandleGetPreviewScene;
-	messageMap["SetPreviewScene"] = WSRequestHandler::HandleSetPreviewScene;
-	messageMap["TransitionToProgram"] = WSRequestHandler::HandleTransitionToProgram;
-	messageMap["EnableStudioMode"] = WSRequestHandler::HandleEnableStudioMode;
-	messageMap["DisableStudioMode"] = WSRequestHandler::HandleDisableStudioMode;
-	messageMap["ToggleStudioMode"] = WSRequestHandler::HandleToggleStudioMode;
-
-	messageMap["SetTextGDIPlusProperties"] = WSRequestHandler::HandleSetTextGDIPlusProperties;
-	messageMap["GetTextGDIPlusProperties"] = WSRequestHandler::HandleGetTextGDIPlusProperties;
-
-	messageMap["GetBrowserSourceProperties"] = WSRequestHandler::HandleGetBrowserSourceProperties;
-	messageMap["SetBrowserSourceProperties"] = WSRequestHandler::HandleSetBrowserSourceProperties;
-
-	messageMap["GetRemoteControlServerStatus"] = WSRequestHandler::HandleGetRemoteControlServerStatus;
-	messageMap["ConnectToRemoteControlServer"] = WSRequestHandler::HandleConnectToRemoteControlServer;
-	messageMap["DisconnectFromRemoteControlServer"] = WSRequestHandler::HandleDisconnectFromRemoteControlServer;
-	
-	authNotRequired.insert("GetVersion");
-	authNotRequired.insert("GetAuthRequired");
-	authNotRequired.insert("Authenticate");
 }
 
 void WSRequestHandler::processIncomingMessage(QString textMessage)
@@ -291,9 +296,9 @@ void WSRequestHandler::HandleGetWebSocketSettings(WSRequestHandler *req)
 
 void WSRequestHandler::HandleSetWebSocketSettings(WSRequestHandler *req)
 {
-	if (!req->hasField("auth") && !req->hasField("local_server_enabled") && !req->hasField("remote_server_enabled") && !req->hasField("auth_enabled") && !req->hasField("remote_server_url") && !req->hasField("local_server_port"))
+	if (!req->hasField("auth") && !req->hasField("local_server_enabled") && !req->hasField("remote_server_enabled") && !req->hasField("auth_enabled") && !req->hasField("remote_server_url") && !req->hasField("local_server_port") && !req->hasField("status_interval_secs"))
 	{
-		req->SendErrorResponse("missing request parameters (one or more): local_server_enabled, remote_server_enabled, enable_auth, remote_server_url, local_server_url");
+		req->SendErrorResponse("missing request parameters (one or more): local_server_enabled, remote_server_enabled, remote_server_url, local_server_url, status_interval_secs, auth_enabled or auth");
 		return;
 	}
 	
@@ -1844,6 +1849,10 @@ void WSRequestHandler::HandleSetBrowserSourceProperties(WSRequestHandler* req)
 void WSRequestHandler::HandleGetRemoteControlServerStatus(WSRequestHandler* req)
 {
 	obs_data_t* response = WSServer::Instance->GetRemoteControlServerData();
+	if (req->_client->property(PROP_AUTHENTICATED).toBool() == false)
+	{
+		obs_data_erase(response, "url");
+	}
 	req->SendResponse(response);
 	obs_data_release(response);
 }

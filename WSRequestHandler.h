@@ -42,8 +42,6 @@ class WSRequestHandler : public QObject
 		const char* _requestType;
 		obs_data_t* data;
 
-		QMap<QString, void(*)(WSRequestHandler*)> messageMap;
-		QSet<QString> authNotRequired;
 
 		void SendOKResponse(obs_data_t* additionalFields = NULL);
 		void SendErrorResponse(const char* errorMessage);
@@ -118,6 +116,9 @@ class WSRequestHandler : public QObject
 		static void HandleGetTextGDIPlusProperties(WSRequestHandler* req);
 		static void HandleSetBrowserSourceProperties(WSRequestHandler* req);
 		static void HandleGetBrowserSourceProperties(WSRequestHandler* req);
+	
+		static QMap<QString, void(*)(WSRequestHandler*)> messageMap;
+		static QSet<QString> authNotRequired;
 };
 
 #endif // WSPROTOCOL_H
