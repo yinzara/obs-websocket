@@ -81,7 +81,7 @@ obs_data_t* WSServer::GetRemoteControlServerData()
 {
 	obs_data_t* response = obs_data_create();
 	WSServer::WSRemoteControlServerStatus status = WSServer::Instance->GetRemoteControlServerStatus();
-	obs_data_set_string(response, "status", GetServerStatus(status));
+	obs_data_set_string(response, "rc-status", GetServerStatus(status));
 	
 	QUrl remoteUrl = WSServer::Instance->GetRemoteControlServerUrl();
 	if (!remoteUrl.isEmpty())

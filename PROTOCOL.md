@@ -305,7 +305,7 @@ Recording stopped successfully.
 
 #### "RemoteControlServerStateChange"  
 The status of the connection to the remote control server has changed
-- **"status"** (string) : Either "CONNECTING", "CONNECTED", "ERROR", or "DISCONNETED"
+- **"rc-status"** (string) : Either "CONNECTING", "CONNECTED", "ERROR", or "DISCONNETED"
 - **"url"** (string) : The URL of the current connection
 - **"error"** (string) : Only present if an error has occurred. A string describing this error.
 
@@ -888,7 +888,7 @@ Gets the current status of the remote control server connection
 __Request fields__ : none
 
 __Response__ : OK with the additional fields :
-- **"status"** (string) : Either "CONNECTING", "CONNECTED", "ERROR", or "DISCONNETED"
+- **"rc-status"** (string) : Either "CONNECTING", "CONNECTED", "ERROR", or "DISCONNETED"
 - **"url"** (string) : The URL of the current connection
 - **"error"** (string) : Only present if an error has occurred. A string describing this error.
 

@@ -290,7 +290,7 @@ void WSRequestHandler::HandleGetWebSocketSettings(WSRequestHandler *req)
 	obs_data_set_bool(response, "auth_enabled", config->AuthRequired);
 	obs_data_set_int(response, "status_interval_secs", config->StatusUpdateIntervalSec);
 	
-	req->SendResponse(response);
+	req->SendOKResponse(response);
 	obs_data_release(response);
 }
 
@@ -1853,7 +1853,7 @@ void WSRequestHandler::HandleGetRemoteControlServerStatus(WSRequestHandler* req)
 	{
 		obs_data_erase(response, "url");
 	}
-	req->SendResponse(response);
+	req->SendOKResponse(response);
 	obs_data_release(response);
 }
 
