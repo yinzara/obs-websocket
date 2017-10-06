@@ -128,24 +128,32 @@ void WSServer::Stop()
 	_wsServer->close();
 }
 
-void WSServer::broadcast(QString message)
+void WSServer::broadcast(obs_data_t* message)
 {
 	_clMutex.lock();
+	
+	const char* json = obs_data_get_json(message);
+	const char* updateType = obs_data_get_string(message, "update-type");
 
 	for(QWebSocket* pClient : _clients) {
 		if (Config::Current()->AuthRequired
-			&& (pClient->property(PROP_AUTHENTICATED).toBool() == false))
+			&& (pClient->property(PROP_AUTHENTICATED).toBool() == false)
+			&& (updateType == nullptr || !WSEvents::authNotRequired.contains(updateType)))
 		{
 			// Skip this client if unauthenticated
 			continue;
 		}
 
-		pClient->sendTextMessage(message);
+		pClient->sendTextMessage(json);
 	}
 
 	if (_serverConnection) {
-		_serverConnection->sendTextMessage(message);
+		_serverConnection->sendTextMessage(json);
 	}
+	
+	
+	if (Config::Current()->DebugEnabled)
+		blog(LOG_DEBUG, "Update << '%s'", json);
 
 	_clMutex.unlock();
 }

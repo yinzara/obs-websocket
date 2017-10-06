@@ -59,6 +59,10 @@ const char* ns_to_timestamp(uint64_t ns)
 
 WSEvents* WSEvents::Instance = nullptr;
 
+QSet<QString> WSEvents::authNotRequired {
+	"RemoteControlServerStateChange"
+};
+
 WSEvents::WSEvents(WSServer* srv)
 {
 	_srv = srv;
@@ -240,10 +244,7 @@ void WSEvents::broadcastUpdate(const char* updateType, obs_data_t* additionalFie
 	if (additionalFields != NULL)
 		obs_data_apply(update, additionalFields);
 
-	const char *json = obs_data_get_json(update);
-	_srv->broadcast(json);
-	if (Config::Current()->DebugEnabled)
-		blog(LOG_DEBUG, "Update << '%s'", json);
+	_srv->broadcast(update);
 
 	obs_data_release(update);
 }

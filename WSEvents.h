@@ -37,6 +37,8 @@ class WSEvents : public QObject
 		void connectSceneSignals(obs_source_t* scene);
 		static WSEvents* Instance;
 
+		static QSet<QString> authNotRequired;
+	
 		uint64_t GetStreamingTime();
 		const char* GetStreamingTimecode();
 		uint64_t GetRecordingTime();
@@ -101,6 +103,7 @@ class WSEvents : public QObject
 		static void OnSceneItemAdd(void* param, calldata_t* data);
 		static void OnSceneItemDelete(void* param, calldata_t* data);
 		static void OnSceneItemVisibilityChanged(void* param, calldata_t* data);
+	
 };
 
 #endif // WSEVENTS_H

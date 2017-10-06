@@ -55,7 +55,7 @@ class WSServer : public QObject
 		virtual ~WSServer();
 		void Start(quint16 port);
 		void Stop();
-		void broadcast(QString message);
+		void broadcast(obs_data_t* message);
 		void ConnectToServer(QUrl url);
 		void DisconnectFromServer();
 		QString GetRemoteControlServerError();
