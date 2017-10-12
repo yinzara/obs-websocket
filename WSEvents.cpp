@@ -60,7 +60,11 @@ const char* ns_to_timestamp(uint64_t ns)
 WSEvents* WSEvents::Instance = nullptr;
 
 QSet<QString> WSEvents::authNotRequired {
-	"RemoteControlServerStateChange"
+	"RemoteControlServerStateChange",
+	"StreamStarted",
+	"StreamStopped",
+	"StreamStarting",
+	"StreamStopping",
 };
 
 WSEvents::WSEvents(WSServer* srv)
