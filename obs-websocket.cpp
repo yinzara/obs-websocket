@@ -64,7 +64,9 @@ bool obs_module_load(void)
 	obs_frontend_pop_ui_translation();
 
 	auto menu_cb = [] {
-		settings_dialog->ToggleShowHide();
+		settings_dialog->show();
+		settings_dialog->raise();
+		settings_dialog->activateWindow();
 	};
 	menu_action->connect(menu_action, &QAction::triggered, menu_cb);
 

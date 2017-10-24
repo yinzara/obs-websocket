@@ -242,14 +242,12 @@ void WSServer::onServerConnection()
 	{
 		cancelReconnect();
 		
-		if (_lastRemoteError.isEmpty()) {
+		if (!_lastRemoteError.isEmpty()) {
 			_lastRemoteError = QString();
 		}
 		
 		_reconnectCount = 1;
 		_currentStatus = WSRemoteControlServerStatus::ConnectedState;
-		
-		_clMutex.lock();
 		
 		connect(_serverConnection, &QWebSocket::textMessageReceived,
 			this, &WSServer::textMessageReceived);
@@ -267,10 +265,7 @@ void WSServer::onServerConnection()
 		}
 		obs_data_release(settings);
 		
-		
 		_serverConnection->sendTextMessage(QString(obs_data_get_json(connectMsg)));
-
-		_clMutex.unlock();
 
 		obs_data_release(connectMsg);
 		

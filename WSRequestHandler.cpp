@@ -330,7 +330,7 @@ void WSRequestHandler::HandleSetWebSocketSettings(WSRequestHandler *req)
 		int port = obs_data_get_int(req->data, "local_server_port");
 		if (port > 0 && (uint64_t) port != config->ServerPort)
 		{
-			config->ServerPort = obs_data_get_int(req->data, "local_server_port");
+			config->ServerPort = port;
 			restartLocalServer = true;
 		}
 	}
