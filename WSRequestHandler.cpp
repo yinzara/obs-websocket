@@ -550,6 +550,11 @@ void WSRequestHandler::HandleStartStreaming(WSRequestHandler* req)
 {
 	if (obs_frontend_streaming_active() == false)
 	{
+		if (WSEvents::Instance->isStreamStarting())
+		{
+			req->SendErrorResponse("the stream is currently starting and cannot be started again");
+			return;
+		}
 		obs_data_t* streamData = obs_data_get_obj(req->data, "stream");
 		obs_service_t* currentService = nullptr;
 		

@@ -46,6 +46,8 @@ class WSEvents : public QObject
 	
 		void OnRemoteControlServerStateChange();
 		void SetStatusInterval(int secs);
+	
+		bool isStreamStarting();
 
 	private Q_SLOTS:
 		void deferredInitOperations();
@@ -60,6 +62,7 @@ class WSEvents : public QObject
 		signal_handler_t* transition_handler;
 		signal_handler_t* scene_handler;
 
+		bool _streaming_started_requested;
 		bool _streaming_active;
 		bool _recording_active;
 

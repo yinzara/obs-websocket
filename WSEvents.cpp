@@ -185,19 +185,23 @@ void WSEvents::FrontendEventHandler(enum obs_frontend_event event, void* private
 	}
 	else if (event == OBS_FRONTEND_EVENT_STREAMING_STARTING)
 	{
+		owner->_streaming_started_requested = true;
 		owner->OnStreamStarting();
 	}
 	else if (event == OBS_FRONTEND_EVENT_STREAMING_STARTED)
 	{
+		owner->_streaming_started_requested = false;
 		owner->_streaming_active = true;
 		owner->OnStreamStarted();
 	}
 	else if (event == OBS_FRONTEND_EVENT_STREAMING_STOPPING)
 	{
+		owner->_streaming_started_requested = false;
 		owner->OnStreamStopping();
 	}
 	else if (event == OBS_FRONTEND_EVENT_STREAMING_STOPPED)
 	{
+		owner->_streaming_started_requested = false;
 		owner->_streaming_active = false;
 		owner->OnStreamStopped();
 	}
@@ -271,6 +275,11 @@ void WSEvents::connectTransitionSignals(obs_source_t* transition)
 	{
 		transition_handler = nullptr;
 	}
+}
+
+bool WSEvents::isStreamStarting()
+{
+	return _streaming_started_requested;
 }
 
 void WSEvents::connectSceneSignals(obs_source_t* scene)
