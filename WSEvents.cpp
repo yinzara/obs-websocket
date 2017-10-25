@@ -100,6 +100,7 @@ WSEvents::WSEvents(WSServer* srv)
 
 	_streaming_active = false;
 	_recording_active = false;
+	_streaming_started_requested = false;
 
 	_stream_starttime = 0;
 	_rec_starttime = 0;
