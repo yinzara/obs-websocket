@@ -413,6 +413,9 @@ QSystemTrayIcon* Utils::GetTrayIcon()
 
 void Utils::SysTrayNotify(QString &text, QSystemTrayIcon::MessageIcon icon, QString title)
 {
+	if (true) //disable all tray notifications as we don't want the user to see them
+		return;
+
 	if (!QSystemTrayIcon::supportsMessages())
 		return;
 
