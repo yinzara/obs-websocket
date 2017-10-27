@@ -611,6 +611,7 @@ void WSRequestHandler::HandleStartStreaming(WSRequestHandler* req)
 		if (service == nullptr)
 		{  //create the new custom service setup by the websocket
 			service = obs_service_create(requestedType, "websocket_custom_service", settings, nullptr);
+			obs_service_release(service);
 		}
 		
 		//Supporting adding metadata parameters to key query string
@@ -1168,9 +1169,14 @@ void WSRequestHandler::HandleSetStreamSettings(WSRequestHandler* req)
 	if (requestedType != nullptr && strcmp(requestedType, serviceType) != 0)
 	{
 		obs_data_t* hotkeys = obs_hotkeys_save_service(service);
+		obs_data_t* newSettings = obs_data_create();
+		obs_data_apply(newSettings, settings);
 		obs_service_release(service);
-		service = obs_service_create(requestedType, "websocket_custom_service", settings, hotkeys);
+		service = obs_service_create(requestedType, "websocket_custom_service", newSettings, hotkeys);
+		obs_frontend_set_streaming_service(service);
+		obs_service_release(service);
 		obs_data_release(hotkeys);
+		obs_data_release(newSettings);
 	}
 	else
 	{
@@ -1188,6 +1194,7 @@ void WSRequestHandler::HandleSetStreamSettings(WSRequestHandler* req)
 	{
 		obs_frontend_save_streaming_service();
 	}
+
 	
 	obs_data_t* response = obs_data_create();
 	obs_data_set_string(response, "type", requestedType);
