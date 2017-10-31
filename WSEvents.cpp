@@ -67,7 +67,8 @@ QSet<QString> WSEvents::authNotRequired {
 	"StreamStopping",
 };
 
-WSEvents::WSEvents(WSServer* srv)
+WSEvents::WSEvents(WSServer* srv) :
+	QObject(srv)
 {
 	_srv = srv;
 	obs_frontend_add_event_callback(WSEvents::FrontendEventHandler, this);
@@ -79,7 +80,7 @@ WSEvents::WSEvents(WSServer* srv)
 	int statusInterval = Config::Current()->StatusUpdateIntervalSec * 1000;
 	if (statusInterval > 0)
 	{
-		_statusTimer = new QTimer();
+		_statusTimer = new QTimer(this);
 		connect(_statusTimer, &QTimer::timeout,
 				this, &WSEvents::StreamStatus);
 		_statusTimer->start(statusInterval);
@@ -488,7 +489,7 @@ void WSEvents::OnExit()
 void WSEvents::OnRemoteControlServerStateChange()
 {
 	// New update type specific to OBS Studio
-	obs_data_t* data = WSServer::Instance->GetRemoteControlServerData();
+	obs_data_t* data = _srv->GetRemoteControlServerData();
 	broadcastUpdate("RemoteControlServerStateChange", data);
 	obs_data_release(data);
 }
