@@ -37,29 +37,32 @@ bool obs_module_load(void)
 {
 	blog(LOG_INFO, "you can haz websockets (version %s)", OBS_WEBSOCKET_VERSION);
 
+	QMainWindow* main_window = (QMainWindow*)obs_frontend_get_main_window();
+
 	// Core setup
-	Config* config = Config::Current();
+	WSServer::Instance = new WSServer(main_window);
+//
+	Config::Instance = new Config(WSServer::Instance);
+
+	Config* config = Config::Instance;
 	config->Load();
 
-	WSServer::Instance = new WSServer();
 	WSEvents::Instance = new WSEvents(WSServer::Instance);
 
-	if (config->ServerEnabled) 
+	if (config->ServerEnabled)
 	{
 		WSServer::Instance->Start(config->ServerPort);
 	}
-	
+
 	if (config->WSServerEnabled && !config->WSServerUrl.isEmpty() && config->WSServerUrl.isValid())
 	{
 		WSServer::Instance->ConnectToServer(config->WSServerUrl);
 	}
 
 	// UI setup
-	QAction *menu_action = (QAction*)obs_frontend_add_tools_menu_qaction(
-		obs_module_text("OBSWebsocket.Menu.SettingsItem"));
+	QAction *menu_action = (QAction*)obs_frontend_add_tools_menu_qaction(obs_module_text("OBSWebsocket.Menu.SettingsItem"));
 
 	obs_frontend_push_ui_translation(obs_module_get_string);
-	QMainWindow* main_window = (QMainWindow*)obs_frontend_get_main_window();
 	settings_dialog = new SettingsDialog(main_window);
 	obs_frontend_pop_ui_translation();
 
