@@ -36,7 +36,6 @@ class WSRequestHandler : public QObject
 		bool hasField(const char* name);
 
 	private:
-		static obs_service_t* _service;
 		QWebSocket* _client;
 		const char* _messageId;
 		const char* _requestType;
@@ -107,7 +106,11 @@ class WSRequestHandler : public QObject
 		static void HandleEnableStudioMode(WSRequestHandler* req);
 		static void HandleDisableStudioMode(WSRequestHandler* req);
 		static void HandleToggleStudioMode(WSRequestHandler* req);
-	
+
+		static void HandleEnablePreview(WSRequestHandler* req);
+		static void HandleDisablePreview(WSRequestHandler* req);
+		static void HandleTogglePreview(WSRequestHandler* req);
+
 		static void HandleGetRemoteControlServerStatus(WSRequestHandler* req);
 		static void HandleConnectToRemoteControlServer(WSRequestHandler* req);
 		static void HandleDisconnectFromRemoteControlServer(WSRequestHandler* req);

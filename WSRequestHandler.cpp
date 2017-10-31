@@ -34,9 +34,6 @@ bool str_valid(const char* str)
 	return (str != nullptr && strlen(str) > 0);
 }
 
-
-obs_service_t* WSRequestHandler::_service = nullptr;
-
 QMap<QString, void(*)(WSRequestHandler*)> WSRequestHandler::messageMap {
 	{"GetVersion", WSRequestHandler::HandleGetVersion},
 	{"GetAuthRequired", WSRequestHandler::HandleGetAuthRequired},
@@ -98,6 +95,10 @@ QMap<QString, void(*)(WSRequestHandler*)> WSRequestHandler::messageMap {
 	{"EnableStudioMode", WSRequestHandler::HandleEnableStudioMode},
 	{"DisableStudioMode", WSRequestHandler::HandleDisableStudioMode},
 	{"ToggleStudioMode", WSRequestHandler::HandleToggleStudioMode},
+	
+	{"EnablePreview", WSRequestHandler::HandleEnablePreview},
+	{"DisablePreview", WSRequestHandler::HandleDisablePreview},
+	{"TogglePreview", WSRequestHandler::HandleTogglePreview},
 	
 	{"SetTextGDIPlusProperties", WSRequestHandler::HandleSetTextGDIPlusProperties},
 	{"GetTextGDIPlusProperties", WSRequestHandler::HandleGetTextGDIPlusProperties},
@@ -556,44 +557,31 @@ void WSRequestHandler::HandleStartStreaming(WSRequestHandler* req)
 			return;
 		}
 		obs_data_t* streamData = obs_data_get_obj(req->data, "stream");
-		obs_service_t* currentService = nullptr;
 		
-		currentService =  obs_frontend_get_streaming_service();
+		obs_service_t* currentService = obs_frontend_get_streaming_service();
 		obs_service_addref(currentService);
 		
-		obs_service_t* service = _service;
 		const char* currentServiceType = obs_service_get_type(currentService);
 		
 		const char* requestedType = obs_data_has_user_value(streamData, "type") ? obs_data_get_string(streamData, "type") : currentServiceType;
-		const char* serviceType = service != nullptr ? obs_service_get_type(service) : currentServiceType;
 		obs_data_t* settings = obs_data_get_obj(streamData, "settings");
+		obs_data_t* metadata = obs_data_get_obj(streamData, "metadata");
 		
+		QString query = Utils::ParseDataToQueryString(metadata);
 		
-		obs_data_t* metadata = obs_data_has_user_value(streamData, "metadata") ? obs_data_get_obj(streamData, "metadata") : obs_data_create();
-		if (!obs_data_has_user_value(metadata, "user"))  //special case to pass current system user to the stream
+		if (strcmp(requestedType, currentServiceType) != 0)
 		{
-			QString user = QProcessEnvironment::systemEnvironment().value(QStringLiteral("USER"), QProcessEnvironment::systemEnvironment().value(QStringLiteral("USERNAME"), QStringLiteral("")));
-			if (!user.isEmpty())
-			{
-				obs_data_set_string(metadata, "user", user.toUtf8().constData());
-			}
-		}
-		QString* query = Utils::ParseDataToQueryString(metadata);
-		
-		if (strcmp(requestedType, serviceType) != 0)
-		{
-			if (settings)
-			{
-				obs_service_release(service);
-				service = nullptr; //different type so we can't reuse the existing service instance
-			}
-			else
+			if (!settings)
 			{
 				req->SendErrorResponse("Service type requested does not match currently configured type and no 'settings' were provided");
+				
+				obs_data_release(metadata);
+				obs_data_release(streamData);
+				obs_service_release(currentService);
 				return;
 			}
 		}
-		else
+		else if (settings || !query.isEmpty())
 		{
 			//if type isn't changing we should overlay the settings we got with the existing settings
 			obs_data_t* existingSettings = obs_service_get_settings(currentService);
@@ -608,43 +596,50 @@ void WSRequestHandler::HandleStartStreaming(WSRequestHandler* req)
 			obs_data_release(existingSettings);
 		}
 		
-		if (service == nullptr)
-		{  //create the new custom service setup by the websocket
-			service = obs_service_create(requestedType, "websocket_custom_service", settings, nullptr);
-			obs_service_release(service);
-		}
-		
 		//Supporting adding metadata parameters to key query string
-		if (query && query->length() > 0) {
+		if (!query.isEmpty())
+		{
 			const char* key = obs_data_get_string(settings, "key");
 			int keylen = strlen(key);
 			bool hasQuestionMark = false;
-			for (int i = 0; i < keylen; i++) {
-				if (key[i] == '?') {
+			for (int i = 0; i < keylen; i++)
+			{
+				if (key[i] == '?')
+				{
 					hasQuestionMark = true;
 					break;
 				}
 			}
-			if (hasQuestionMark) {
-				query->prepend('&');
-			} else {
-				query->prepend('?');
+			if (hasQuestionMark)
+			{
+				query.prepend('&');
 			}
-			query->prepend(key);
-			key = query->toUtf8().constData();
-			obs_data_set_string(settings, "key", key);
+			else
+			{
+				query.prepend('?');
+			}
+			query.prepend(key);
+			obs_data_set_string(settings, "key", query.toUtf8());
 		}
 		
-		obs_service_update(service, settings);
+		
+		if (settings)
+		{
+			obs_service_t *service = obs_service_create(requestedType, "websocket_custom_service", settings, nullptr);
+			
+			obs_frontend_streaming_start(service);
+		
+			obs_service_release(service);
+		}
+		else
+			obs_frontend_streaming_start();
+		
+		
+		req->SendOKResponse();
+		
 		obs_data_release(settings);
 		obs_data_release(metadata);
-		_service = service;
-		
-		obs_frontend_set_streaming_service(_service);
-		obs_frontend_streaming_start();
-		obs_frontend_set_streaming_service(currentService);
-				
-		req->SendOKResponse();
+		obs_data_release(streamData);
 		obs_service_release(currentService);
 	}
 	else
@@ -1154,7 +1149,6 @@ void WSRequestHandler::HandleGetCurrentProfile(WSRequestHandler* req)
 
 void WSRequestHandler::HandleSetStreamSettings(WSRequestHandler* req)
 {
-	obs_service_t* service = obs_frontend_get_streaming_service();
 	
 	obs_data_t* settings = obs_data_get_obj(req->data, "settings");
 	if (!settings)
@@ -1163,31 +1157,25 @@ void WSRequestHandler::HandleSetStreamSettings(WSRequestHandler* req)
 		return;
 	}
 	
+	obs_service_t* service = obs_frontend_get_streaming_service();
+	obs_service_addref(service);
+	
 	const char* serviceType = obs_service_get_type(service);
 	const char* requestedType = obs_data_get_string(req->data, "type");
 	
-	if (requestedType != nullptr && strcmp(requestedType, serviceType) != 0)
+	if (requestedType && strcmp(requestedType, serviceType) != 0)
 	{
 		obs_data_t* hotkeys = obs_hotkeys_save_service(service);
-		obs_data_t* newSettings = obs_data_create();
-		obs_data_apply(newSettings, settings);
 		obs_service_release(service);
-		service = obs_service_create(requestedType, "websocket_custom_service", newSettings, hotkeys);
+		service = obs_service_create(requestedType, "websocket_custom_service", settings, hotkeys);
 		obs_frontend_set_streaming_service(service);
-		obs_service_release(service);
 		obs_data_release(hotkeys);
-		obs_data_release(newSettings);
 	}
 	else
 	{
-		obs_data_t* existingSettings = obs_service_get_settings(service);  //if type isn't changing we should overlay the settings we got with the existing settings
-		obs_data_t* newSettings = obs_data_create(); //by doing this you can send a request to the websocket that only contains a setting you want to change instead of having to do a get and then change them
-		obs_data_apply(newSettings, existingSettings); //first apply the existing settings
-		obs_data_apply(newSettings, settings); //then apply the settings from the request
+		obs_service_update(service, settings); //this automatically overlays settings on the existing settings
 		obs_data_release(settings);
-		obs_data_release(existingSettings);
-		obs_service_update(service, settings);
-		settings = newSettings;
+		settings = obs_service_get_settings(service);
 	}
 	
 	if (obs_data_get_bool(req->data, "save")) //if save is specified we should immediately save the streaming service
@@ -1202,6 +1190,7 @@ void WSRequestHandler::HandleSetStreamSettings(WSRequestHandler* req)
 	
 	req->SendOKResponse(response);
 	
+	obs_service_release(service);
 	obs_data_release(settings);
 	obs_data_release(response);
 }
@@ -1366,6 +1355,27 @@ void WSRequestHandler::HandleDisableStudioMode(WSRequestHandler* req)
 void WSRequestHandler::HandleToggleStudioMode(WSRequestHandler* req)
 {
 	Utils::TogglePreviewMode();
+	req->SendOKResponse();
+}
+
+void WSRequestHandler::HandleEnablePreview(WSRequestHandler* req)
+{
+	Utils::EnablePreview();
+	req->SendOKResponse();
+}
+
+void WSRequestHandler::HandleDisablePreview(WSRequestHandler* req)
+{
+	Utils::DisablePreview();
+	req->SendOKResponse();
+}
+
+void WSRequestHandler::HandleTogglePreview(WSRequestHandler* req)
+{
+	if (Utils::IsPreviewEnabled())
+		Utils::DisablePreview();
+	else
+		Utils::EnablePreview();
 	req->SendOKResponse();
 }
 
