@@ -42,9 +42,9 @@ bool obs_module_load(void)
 	// Core setup
 	WSServer::Instance = new WSServer(main_window);
 //
-	Config::Instance = new Config(WSServer::Instance);
+	Config* config = new Config(WSServer::Instance);
 
-	Config* config = Config::Instance;
+	Config::Instance = config;
 	config->Load();
 
 	WSEvents::Instance = new WSEvents(WSServer::Instance);
