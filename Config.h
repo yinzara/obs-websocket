@@ -21,13 +21,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <mbedtls/entropy.h>
 #include <mbedtls/ctr_drbg.h>
-
+#include <QtCore/QObject>
 #include <QUrl>
 
-class Config
+class Config : public QObject
 {
 	public:
-		Config();
+		explicit Config(QObject* parent = Q_NULLPTR);
 		~Config();
 		void Load();
 		void Save();
@@ -45,6 +45,8 @@ class Config
 
 		bool AuthRequired;
 	
+		static Config* Instance;
+	
 		int StatusUpdateIntervalSec;
 		const char *Secret;
 		const char *Salt;
@@ -52,11 +54,10 @@ class Config
 		bool WSServerEnabled;
 		QUrl WSServerUrl;
 		bool SettingsLoaded;
-		
-		static Config* Current();
 
+		static Config* Current();
+	
 	private:
-		static Config *_instance;
 		mbedtls_entropy_context entropy;
 		mbedtls_ctr_drbg_context rng;
 };

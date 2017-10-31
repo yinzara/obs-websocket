@@ -36,9 +36,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #define PARAM_WS_SERVER_URL "WSServerUrl"
 #define PARAM_STATUS_INTERVAL "StatusInterval"
 
-Config *Config::_instance = new Config();
+Config* Config::Instance = nullptr;
 
-Config::Config()
+Config::Config(QObject *parent) :
+	QObject(parent)
 {
 	// Default settings
 	ServerEnabled = true;
@@ -59,19 +60,19 @@ Config::Config()
 	config_t* obs_config = obs_frontend_get_global_config();
 	if (obs_config)
 	{
-		config_set_default_bool(obs_config, 
+		config_set_default_bool(obs_config,
 			SECTION_NAME, PARAM_ENABLE, ServerEnabled);
-		config_set_default_uint(obs_config, 
+		config_set_default_uint(obs_config,
 			SECTION_NAME, PARAM_PORT, ServerPort);
-			
+
 		config_set_default_bool(obs_config,
 			SECTION_NAME, PARAM_DEBUG, DebugEnabled);
 
-		config_set_default_bool(obs_config, 
+		config_set_default_bool(obs_config,
 			SECTION_NAME, PARAM_AUTHREQUIRED, AuthRequired);
-		config_set_default_string(obs_config, 
+		config_set_default_string(obs_config,
 			SECTION_NAME, PARAM_SECRET, Secret);
-		config_set_default_string(obs_config, 
+		config_set_default_string(obs_config,
 			SECTION_NAME, PARAM_SALT, Salt);
 
 		config_set_default_string(obs_config,
@@ -79,7 +80,7 @@ Config::Config()
 		
 		config_set_default_bool(obs_config,
 			SECTION_NAME, PARAM_WS_SERVER_ENABLE, WSServerEnabled);
-		
+
 		config_set_default_int(obs_config,
 			SECTION_NAME, PARAM_STATUS_INTERVAL, StatusUpdateIntervalSec);
 	}
@@ -96,6 +97,9 @@ Config::~Config()
 {
 	mbedtls_ctr_drbg_free(&rng);
 	mbedtls_entropy_free(&entropy);
+	bfree((void*) SessionChallenge);
+	bfree((void*) Secret);
+	bfree((void*) Salt);
 }
 
 void Config::Load()
@@ -108,8 +112,8 @@ void Config::Load()
 	DebugEnabled = config_get_bool(obs_config, SECTION_NAME, PARAM_DEBUG);
 
 	AuthRequired = config_get_bool(obs_config, SECTION_NAME, PARAM_AUTHREQUIRED);
-	Secret = config_get_string(obs_config, SECTION_NAME, PARAM_SECRET);
-	Salt = config_get_string(obs_config, SECTION_NAME, PARAM_SALT);
+	Secret = bstrdup(config_get_string(obs_config, SECTION_NAME, PARAM_SECRET));
+	Salt = bstrdup(config_get_string(obs_config, SECTION_NAME, PARAM_SALT));
 
 	WSServerUrl = QUrl(QString(config_get_string(obs_config, SECTION_NAME, PARAM_WS_SERVER_URL)));
 	WSServerEnabled = config_get_bool(obs_config, SECTION_NAME, PARAM_WS_SERVER_ENABLE);
@@ -180,7 +184,9 @@ void Config::SetPassword(const char *password)
 {
 	const char *new_salt = GenerateSalt();
 	const char *new_challenge = GenerateSecret(password, new_salt);
-
+	
+	bfree((void*) Secret);
+	bfree((void*) Salt);
 	this->Salt = new_salt;
 	this->Secret = new_challenge;
 }
@@ -208,6 +214,7 @@ bool Config::CheckAuth(const char *response)
 
 	bool authSuccess = false;
 	if (strcmp(expected_response, response) == 0) {
+		bfree((void*) SessionChallenge);
 		SessionChallenge = GenerateSalt();
 		authSuccess = true;
 	}
@@ -219,5 +226,5 @@ bool Config::CheckAuth(const char *response)
 
 Config* Config::Current()
 {
-	return _instance;
+	return Config::Instance;
 }
