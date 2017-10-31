@@ -49,6 +49,8 @@ SettingsDialog::SettingsDialog(QWidget* parent) :
 
 void SettingsDialog::showEvent(QShowEvent* event)
 {
+	UNUSED_PARAMETER(event);
+	
 	Config* conf = Config::Current();
 
 	ui->serverEnabled->setChecked(conf->ServerEnabled);
@@ -129,7 +131,7 @@ void SettingsDialog::FormAccepted()
 	
 	conf->WSServerEnabled = ui->remoteServerEnabled->isChecked();
 	
-	conf->WSServerUrl = ui->serverUrl->text().length() > 5 ? QUrl(ui->serverUrl->text()) : QUrl(QStringLiteral(""));
+	conf->WSServerUrl = ui->serverUrl->text().length() > 5 ? QUrl(ui->serverUrl->text()) : QUrl();
 
 	if (ui->authRequired->isChecked())
 	{
