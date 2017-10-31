@@ -297,33 +297,39 @@ QLayout* Utils::GetPreviewLayout()
 
 bool Utils::IsPreviewModeActive()
 {
-	QMainWindow* main = (QMainWindow*)obs_frontend_get_main_window();
-
-	// Clue 1 : "Studio Mode" button is toggled on
-	bool buttonToggledOn = GetPreviewModeButtonControl()->isChecked();
-
-	// Clue 2 : Preview layout has more than one item
-	int previewChildCount = GetPreviewLayout()->count();
-	blog(LOG_INFO, "preview layout children count : %d", previewChildCount);
-
-	return buttonToggledOn || (previewChildCount >= 2);
+	return obs_frontend_preview_program_mode_active();
 }
 
 void Utils::EnablePreviewMode()
 {
-	if (!IsPreviewModeActive())
-		GetPreviewModeButtonControl()->click();
+	if (!Utils::IsPreviewModeActive())
+		obs_frontend_set_preview_program_mode(true);
 }
 
 void Utils::DisablePreviewMode()
 {
-	if (IsPreviewModeActive())
-		GetPreviewModeButtonControl()->click();
+	if (Utils::IsPreviewModeActive())
+		obs_frontend_set_preview_program_mode(false);
 }
 
 void Utils::TogglePreviewMode()
 {
-	GetPreviewModeButtonControl()->click();
+	obs_frontend_set_preview_program_mode(!obs_frontend_preview_program_mode_active());
+}
+
+bool Utils::IsPreviewEnabled()
+{
+	return obs_frontend_preview_enabled();
+}
+
+void Utils::EnablePreview()
+{
+	obs_frontend_set_preview_enabled(true);
+}
+
+void Utils::DisablePreview()
+{
+	obs_frontend_set_preview_enabled(false);
 }
 
 obs_scene_t* Utils::GetPreviewScene()
@@ -427,7 +433,7 @@ void Utils::SysTrayNotify(QString &text, QSystemTrayIcon::MessageIcon icon, QStr
 QString Utils::FormatIPAddress(QHostAddress &addr)
 {
 	if (addr.protocol() == QAbstractSocket::IPv4Protocol)
-		QString v4addr = addr.toString().replace("::fff:", "");
+		return addr.toString().replace("::fff:", "");
 
 	return addr.toString();
 }
@@ -470,55 +476,60 @@ bool Utils::SetRecordingFolder(const char* path)
 	return true;
 }
 
-QString* Utils::ParseDataToQueryString(obs_data_t * data)
-{
-	QString* query = nullptr;
-	if (data)
-	{
-		obs_data_item_t* item = obs_data_first(data);
-		if (item)
-		{
-			query = new QString();
-			bool isFirst = true;
-			do
-			{
-				if (!obs_data_item_has_user_value(item))
-					continue;
-				
-				if (!isFirst)
-					query->append('&');
-				else
-					isFirst = false;
-				
-				const char* attrName = obs_data_item_get_name(item);
-				query->append(attrName).append("=");
-				switch (obs_data_item_gettype(item))
-				{
-					case OBS_DATA_BOOLEAN:
-						query->append(obs_data_item_get_bool(item)?"true":"false");
-						break;
-					case OBS_DATA_NUMBER:
-						switch (obs_data_item_numtype(item))
-						{
-							case OBS_DATA_NUM_DOUBLE:
-								query->append(QString::number(obs_data_item_get_double(item)));
-								break;
-							case OBS_DATA_NUM_INT:
-								query->append(QString::number(obs_data_item_get_int(item)));
-								break;
-							case OBS_DATA_NUM_INVALID:
-								break;
-						}
-						break;
-					case OBS_DATA_STRING:
-						query->append(QUrl::toPercentEncoding(QString(obs_data_item_get_string(item))));
-						break;
-					default:
-						//other types are not supported
-						break;
-				}
-			} while ( obs_data_item_next( &item ) );
-		}
+QString Utils::ParseDataToQueryString(obs_data_t* data) {
+	if (!data)
+		return QString();
+	
+	QString query;
+	
+	
+	obs_data_item_t* item = obs_data_first(data);
+	if (item) {
+		bool isFirst = true;
+		do {
+			if (!obs_data_item_has_user_value(item))
+				continue;
+			
+			if (!isFirst)
+				query += "&";
+			else
+				isFirst = false;
+			
+			QString attrName = obs_data_item_get_name(item);
+			query += (attrName + "=");
+			
+			switch (obs_data_item_gettype(item)) {
+				case OBS_DATA_BOOLEAN:
+					query += (obs_data_item_get_bool(item) ? "true" : "false");
+					break;
+					
+				case OBS_DATA_NUMBER:
+					switch (obs_data_item_numtype(item)) {
+						case OBS_DATA_NUM_DOUBLE:
+							query +=
+							QString::number(obs_data_item_get_double(item));
+							break;
+						case OBS_DATA_NUM_INT:
+							query +=
+							QString::number(obs_data_item_get_int(item));
+							break;
+						case OBS_DATA_NUM_INVALID:
+							break;
+					}
+					break;
+					
+				case OBS_DATA_STRING:
+					query +=
+					QUrl::toPercentEncoding(
+											QString(obs_data_item_get_string(item)));
+					break;
+					
+				default:
+					//other types are not supported
+					break;
+			}
+			
+		} while (obs_data_item_next(&item));
 	}
 	
 	return query;

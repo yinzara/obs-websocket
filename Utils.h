@@ -60,6 +60,10 @@ class Utils
 		static void EnablePreviewMode();
 		static void DisablePreviewMode();
 		static void TogglePreviewMode();
+	
+		static bool IsPreviewEnabled();
+		static void EnablePreview();
+		static void DisablePreview();
 
 		static obs_scene_t* GetPreviewScene();
 		static bool SetPreviewScene(const char* name);
@@ -77,7 +81,7 @@ class Utils
 		static const char* GetRecordingFolder();
 		static bool SetRecordingFolder(const char* path);
 	
-		static QString* ParseDataToQueryString(obs_data_t * data);
+		static QString ParseDataToQueryString(obs_data_t * data);
 };
 
 #endif // UTILS_H
