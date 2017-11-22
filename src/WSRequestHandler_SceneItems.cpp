@@ -449,7 +449,7 @@ void WSRequestHandler::HandleSetSceneItemPosition(WSRequestHandler* req) {
 
 	OBSSceneItem sceneItem = Utils::GetSceneItemFromName(scene, itemName);
 	if (sceneItem) {
-		vec2 item_position = { 0 };
+		vec2 item_position;
 		item_position.x = obs_data_get_double(req->data, "x");
 		item_position.y = obs_data_get_double(req->data, "y");
 		obs_sceneitem_set_pos(sceneItem, &item_position);
