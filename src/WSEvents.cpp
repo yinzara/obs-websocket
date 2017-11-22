@@ -316,7 +316,10 @@ void WSEvents::OnSceneChange() {
  * @since 0.3
  */
 void WSEvents::OnSceneListChange() {
-    broadcastUpdate("ScenesChanged");
+    OBSDataAutoRelease data = obs_data_create();
+    OBSDataArrayAutoRelease scenes = Utils::GetScenes();
+    obs_data_set_array(data, "scenes", scenes);
+    broadcastUpdate("ScenesChanged", data);
 }
 
 /**
@@ -328,7 +331,10 @@ void WSEvents::OnSceneListChange() {
  * @since 4.0.0
  */
 void WSEvents::OnSceneCollectionChange() {
-    broadcastUpdate("SceneCollectionChanged");
+    OBSDataAutoRelease data = obs_data_create();
+    obs_data_set_string(data, "sc-name", obs_frontend_get_current_scene_collection());
+    
+    broadcastUpdate("SceneCollectionChanged", data);
 
     sceneHandler = nullptr;
     transitionHandler = nullptr;
@@ -349,7 +355,14 @@ void WSEvents::OnSceneCollectionChange() {
  * @since 4.0.0
  */
 void WSEvents::OnSceneCollectionListChange() {
-    broadcastUpdate("SceneCollectionListChanged");
+    char** sceneCollections = obs_frontend_get_scene_collections();
+    OBSDataArrayAutoRelease list =
+    Utils::StringListToArray(sceneCollections, "sc-name");
+    bfree(sceneCollections);
+    
+    OBSDataAutoRelease data = obs_data_create();
+    obs_data_set_array(data, "scene-collections", list);
+    broadcastUpdate("SceneCollectionListChanged", data);
 }
 
 /**
@@ -395,7 +408,9 @@ void WSEvents::OnTransitionListChange() {
  * @since 4.0.0
  */
 void WSEvents::OnProfileChange() {
-    broadcastUpdate("ProfileChanged");
+    OBSDataAutoRelease data = obs_data_create();
+    obs_data_set_string(data, "profile-name", obs_frontend_get_current_profile());
+    broadcastUpdate("ProfileChanged", data);
 }
 
 /**
@@ -407,7 +422,14 @@ void WSEvents::OnProfileChange() {
  * @since 4.0.0
  */
 void WSEvents::OnProfileListChange() {
-    broadcastUpdate("ProfileListChanged");
+    char** profiles = obs_frontend_get_profiles();
+    OBSDataArrayAutoRelease list =
+    Utils::StringListToArray(profiles, "profile-name");
+    bfree(profiles);
+    
+    OBSDataAutoRelease data = obs_data_create();
+    obs_data_set_array(data, "profiles", list);
+    broadcastUpdate("ProfileListChanged", data);
 }
 
 /**
