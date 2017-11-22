@@ -23,6 +23,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QTimer>
 #include <QCoreApplication>
 
+#include "wampinvocation.h"
+#include "wampconnection_p.h"
+#include "wamperror.h"
+
 #include "obs-websocket.h"
 #include "WSServer.h"
 #include "WSEvents.h"
@@ -52,41 +56,46 @@ bool obs_module_load(void) {
     blog(LOG_INFO, "you can haz websockets (version %s)", OBS_WEBSOCKET_VERSION);
     blog(LOG_INFO, "qt version (compile-time): %s ; qt version (run-time): %s",
         QT_VERSION_STR, qVersion());
-    QMainWindow* main_window = (QMainWindow*)obs_frontend_get_main_window();
     // Core setup
-    Config* config = new Config(main_window);
+    Config* config = new Config(nullptr);
     Config::SetCurrent(config);
     config->Load();
 
-    WSServer::Instance = new WSServer(main_window);
+    WSServer::Instance = new WSServer(config);
     WSEvents::Instance = new WSEvents(WSServer::Instance);
 
-    Wamp wamp;
-    wamp.registerTypes("obs-websocket");
-
-    CorePlugin core;
-    core.registerTypes("obs-websocket");
-
-    Websockets websockets;
-    websockets.registerTypes("obs-websocket");
-	
+//    Wamp wamp;
+//    wamp.registerTypes("obs-websocket");
+//
+//    CorePlugin core;
+//    core.registerTypes("obs-websocket");
+//
+//    Websockets websockets;
+//    websockets.registerTypes("obs-websocket");
+    
+    qRegisterMetaType<WampInvocationPointer>("WampInvocationPointer");
+    qRegisterMetaType<Event>("Event");
+    qRegisterMetaType<WampError>("WampError");
+    QMetaType::registerConverter<WampError, QString>(&WampError::toString);
+    
     if (config->ServerEnabled)
     {
         WSServer::Instance->Start(config->ServerPort);
     }
     if (config->WampEnabled)
     {
-        WSServer::Instance->
-        StartWamp(
-                  config->WampUrl,
-                  config->WampRealm,
-                  config->WampBaseUri,
-                  config->WampIdEnabled?config->WampId:QString(),
-                  config->WampAuthEnabled?config->WampUser:QString(),
-                  config->WampAuthEnabled?config->WampPassword:QString());
+        QMetaObject::invokeMethod(WSServer::Instance, "StartWamp",
+          Q_ARG(QUrl, config->WampUrl),
+          Q_ARG(QString, config->WampRealm),
+          Q_ARG(QString, config->WampBaseUri),
+          Q_ARG(QString, config->WampIdEnabled?config->WampId:""),
+          Q_ARG(QString, config->WampAuthEnabled?config->WampUser:""),
+          Q_ARG(QString, config->WampAuthEnabled?config->WampPassword:""));
     }
 
     // UI setup
+    
+    QMainWindow* main_window = (QMainWindow*)obs_frontend_get_main_window();
     QAction* menu_action = (QAction*)obs_frontend_add_tools_menu_qaction(
         obs_module_text("OBSWebsocket.Menu.SettingsItem"));
 
@@ -107,6 +116,7 @@ bool obs_module_load(void) {
 }
 
 void obs_module_unload() {
-    blog(LOG_INFO, "goodbye!");    
+    blog(LOG_INFO, "goodbye!");
+    Config::Current()->deleteLater();
 }
 

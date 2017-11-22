@@ -66,6 +66,7 @@ class WSServer : public QObject {
     void RegisterWampProcedures();
     void RegisterWamp();
     void CompleteWampRegistration(QVariant v);
+    void BroadcastWampConnected();
 
     void onWampConnected();
     void onWampDisconnected();

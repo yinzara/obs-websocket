@@ -27,6 +27,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "obs-websocket.h"
 #include "Config.h"
 #include "Utils.h"
+#include "QTimer.h"
+
+#define STREAM_SERVICE_ID "websocket_custom_service"
 
 #define WAMP_FUNCTION_PREFIX ".f."
 #define WAMP_TOPIC_PREFIX ".t."
@@ -120,7 +123,9 @@ void WSServer::StartWamp(QUrl url, QString realm, QString baseUri, QString id, Q
     if (_wampConnection) {
         disconnect(_wampConnection, &WampConnection::disconnected,
             this, &WSServer::onWampDisconnected); //ignore the disconnected event for the other socket
-        delete _wampConnection;
+        disconnect(_wampConnection, &WampConnection::error,
+                   this, &WSServer::onWampError); //ignore the error event for the other socket
+        _wampConnection->deleteLater();
     }
     _wampConnection = new WampConnection(this);
     _wampConnection->setUrl(url);
@@ -136,7 +141,13 @@ void WSServer::StartWamp(QUrl url, QString realm, QString baseUri, QString id, Q
     _wampUrl = url;
     _wampUser = user;
 
-    qInfo() << "wamp " << _wampUrl << " connecting";
+    qInfo() << "WAMP Connecting:"
+        << "\nurl: " << url
+        << "\nrealm: " << realm
+        << "\nid: " << id
+        << "\nuser: " << user
+        << "\npassword: " << password
+        << "\nbaseuri: " << baseUri;
 
     connect(_wampConnection, &WampConnection::connected,
             this, &WSServer::onWampConnected);
@@ -150,11 +161,11 @@ void WSServer::StartWamp(QUrl url, QString realm, QString baseUri, QString id, Q
 
 void WSServer::StopWamp()
 {
-    delete _wampConnection;
+    _wampConnection->deleteLater();
     _wampConnection = nullptr;
     _wampId = QString();
     _wampRealm = QString();
-    _wampUrl = QString();
+    _wampUrl = QUrl();
     _wampUser = QString();
 }
 
@@ -174,12 +185,7 @@ void WSServer::onWampConnected()
     
     Utils::WampSysTrayNotify(msg, QSystemTrayIcon::Information, title);
 
-    QVariantList args = QVariantList();
-    if (!_wampId.isEmpty())
-        args.append(_wampId);
-    
     RegisterWamp();
-    
 }
 
 void WSServer::onWampDisconnected()
@@ -202,21 +208,11 @@ void WSServer::onWampDisconnected()
 
 void WSServer::onWampError(const WampError& error)
 {
-    //fall back to anonymous if the connection attempt fails and a user was specified and we are configured to fallback
-    if ((_wampStatus == WampConnectionStatus::Connecting || _wampStatus == WampConnectionStatus::Disconnected) && !_wampUrl.isEmpty() && Config::Current()->WampAnonymousFallback && !_wampConnection->user()->name().isEmpty()) {
-        QUrl url = _wampUrl; // to force the reconnect
-        _wampUrl = QString();
-        QMetaObject::invokeMethod(this, "StartWamp", Qt::QueuedConnection,
-              Q_ARG(QUrl, url),
-              Q_ARG(QString, _wampRealm),
-              Q_ARG(QString, _wampBaseUri),
-              Q_ARG(QString, _wampId));
-        return;
-    }
     
-    _wampStatus = WampConnectionStatus::Error;
+    if (_wampStatus != WampConnectionStatus::Connected)
+        _wampStatus = WampConnectionStatus::Error;
     _wampErrorUri = error.uri().toString();
-    
+        
     QVariantList args = error.args();
     if (!args.isEmpty())
         _wampErrorMessage = args.first().toString();
@@ -231,6 +227,25 @@ void WSServer::onWampError(const WampError& error)
     else
     {
         obs_data_clear(_wampErrorData);
+    }
+    
+    //fall back to anonymous if the connection attempt fails and a user was specified and we are configured to fallback
+    if ((_wampStatus == WampConnectionStatus::Connecting || _wampStatus == WampConnectionStatus::Disconnected) && !_wampUrl.isEmpty() && Config::Current()->WampAnonymousFallback && !_wampConnection->user()->name().isEmpty()) {
+        qInfo() << "Connection error while connecting. Attempting anonymous fallback";
+        
+        this->_wampConnection->deleteLater();
+        this->_wampConnection = nullptr;
+        QUrl url = _wampUrl;
+        _wampUrl = QUrl(); //reset before
+        QTimer::singleShot(3000, [=](){
+            QMetaObject::invokeMethod(this, "StartWamp", Qt::QueuedConnection,
+                                      Q_ARG(QUrl, url),
+                                      Q_ARG(QString, _wampRealm),
+                                      Q_ARG(QString, _wampBaseUri),
+                                      Q_ARG(QString, _wampId));
+        });
+        
+        return;
     }
     
     blog(LOG_INFO, "wamp %s error %s (%s)",
@@ -370,18 +385,40 @@ void WSServer::RegisterWamp()
     if (!regProc.isEmpty())
     {
         qInfo() << "Calling WAMP registration procedure: " << regProc;
+        OBSSourceAutoRelease scene = obs_frontend_get_current_scene();
+        QString sceneCollection = obs_frontend_get_current_scene_collection();
+        QString sceneName = obs_source_get_name(scene) ;
+        QString profile = obs_frontend_get_current_profile();
+        bool recording = obs_frontend_recording_active();
+        bool streaming = obs_frontend_streaming_active();
         
+        OBSService service = obs_frontend_get_streaming_service();
+        QString serviceType = obs_service_get_type(service);
+        OBSDataAutoRelease settings = obs_service_get_settings(service);
+        QVariantMap settingsMap = Utils::MapFromData(settings);
+        
+        QVariantMap stream {
+            { "type" , serviceType },
+            { "settings", settingsMap }
+        };
         QVariantMap r {
-            {"id" , _wampId},
-            {"user", _wampUser},
-            {"url", _wampUrl},
-            {"realm", _wampRealm},
-            {"baseuri", _wampBaseUri}
+            { "id" , _wampId },
+            { "user", _wampUser },
+            { "url", _wampUrl },
+            { "realm", _wampRealm },
+            { "baseuri", _wampBaseUri },
+            { "scene-collection", sceneCollection },
+            { "scene-name", sceneName },
+            { "profile", profile },
+            { "recording", recording },
+            { "streaming", streaming },
+            { "stream", stream }
         };
         QVariantList args { r };
         QVariantMap options {
             {"disclose_me", true }
         };
+        
         _wampConnection->call2(regProc, args, [this](QVariant v) {
             this->CompleteWampRegistration(v);
         }, options);
@@ -395,7 +432,12 @@ void WSServer::RegisterWamp()
 void WSServer::CompleteWampRegistration(QVariant v)
 {
     Config* config = Config::Current();
-    qInfo() << "Received registration response from WAMP server";
+    QString currentSceneCollection = obs_frontend_get_current_scene_collection();
+    OBSSourceAutoRelease scene = obs_frontend_get_current_scene();
+    QString currentSceneName = obs_source_get_name(scene);
+    QString currentProfile = obs_frontend_get_current_profile();
+    bool currentlyStreaming = obs_frontend_streaming_active();
+    bool currentlyRecording = obs_frontend_recording_active();
     
     QVariantMap r;
     if (v.type() == QVariant::Map) {
@@ -411,53 +453,172 @@ void WSServer::CompleteWampRegistration(QVariant v)
     QUrl url = r["url"].toUrl();
     QString realm = r["realm"].toString();
     QString baseuri = r["baseuri"].toString();
+    QString sceneCollection = r["scene-collection"].toString();
+    QString sceneName = r["scene-name"].toString();
+    QString profile = r["profile"].toString();
+    QVariantMap stream = r["stream"].toMap();
+    
     
     bool save = r["save"].toBool();
     bool reconnect = r["reconnect"].toBool();
     bool canRegister = r.contains("register") ? r["register"].toBool() : true;
     _canPublish = r.contains("publish") ? r["publish"].toBool() : true;
+    bool recording = r["recording"].toBool();
+    bool streaming = r["streaming"].toBool();
+    
+    
+    bool projectChanged  = false;
+    
+    qInfo() << "Received registration response from WAMP server:"
+    << "\nid: " << id
+    << "\nsecret: " << secret
+    << "\nuser: " << user
+    << "\nurl: " << url
+    << "\nrealm: " << realm
+    << "\nbaseurl: " << baseuri
+    << "\nscene-collection: " << sceneCollection
+    << "\nscene-name: " << sceneName
+    << "\nprofile: " << profile
+    << "\nsave: " << save
+    << "\nreconnect: " << reconnect
+    << "\nregister: " << canRegister
+    << "\npublish: " << _canPublish;
+    
     
     if (!id.isEmpty() && id != config->WampId)
+    {
         config->WampId = id;
-    if (!baseuri.isEmpty() && baseuri != config->WampBaseUri)
-        config->WampBaseUri = baseuri;
-    if (!user.isEmpty() && user != config->WampUser)
-        config->WampUser = user;
-    if (!secret.isEmpty() && secret != config->WampPassword) {
-        config->WampPassword = secret;
-        _wampConnection->setUser(new WampCraUser(config->WampUser, config->WampPassword));  //update on the current conncetion in the case of a reconnection
+        _wampId = id;
     }
-    if (!url.isEmpty() && url != config->WampUrl) {
+    if (!baseuri.isEmpty() && baseuri != config->WampBaseUri)
+    {
+        config->WampBaseUri = baseuri;
+        _wampBaseUri = baseuri;
+    }
+    if (!user.isEmpty() && user != config->WampUser)
+    {
+        config->WampUser = user;
+        _wampUser = user;
+    }
+    if (!secret.isEmpty() && secret != config->WampPassword)
+    {
+        config->WampPassword = secret;
+        _wampConnection->setUser(new WampCraUser(config->WampUser, config->WampPassword));
+    }
+    if (!url.isEmpty() && url != config->WampUrl)
+    {
         config->WampUrl = url;
+        _wampUrl = url;
         _wampConnection->setUrl(url);
     }
-    if (!realm.isEmpty() && realm != config->WampRealm) {
+    if (!realm.isEmpty() && realm != config->WampRealm)
+    {
         config->WampRealm = realm;
+        _wampRealm = realm;
         _wampConnection->setRealm(realm);
+    }
+    
+    if (!profile.isEmpty() && profile != currentProfile)
+    {
+        obs_frontend_set_current_profile(profile.toUtf8());
+    }
+    if (!sceneCollection.isEmpty() && sceneCollection != currentSceneCollection)
+    {
+        projectChanged = true;
+        obs_frontend_set_current_scene_collection(sceneCollection.toUtf8());
+    }
+    if (!sceneName.isEmpty() && sceneName != currentSceneName)
+    {
+        projectChanged = true;
+        OBSSourceAutoRelease scene = obs_get_source_by_name(sceneName.toUtf8());
+        if (scene)
+            obs_frontend_set_current_scene(scene);
+    }
+    if (streaming != currentlyStreaming && r.contains("streaming"))
+    {
+        if (currentlyStreaming)
+            obs_frontend_streaming_stop();
+        else
+            obs_frontend_streaming_start();
+    }
+    
+    if (recording != currentlyRecording && r.contains("recording"))
+    {
+        if (currentlyRecording)
+            obs_frontend_recording_stop();
+        else
+            obs_frontend_recording_start();
+    }
+        
+    if (!stream.isEmpty())
+    {
+        OBSService service = obs_frontend_get_streaming_service();
+        QString currentServiceType = obs_service_get_type(service);
+        OBSDataAutoRelease currentSettings = obs_service_get_settings(service);
+        
+        QString requestedType = stream["type"].toString();
+        QVariantMap settingsMap = stream["settings"].toMap();
+        if (!settingsMap.isEmpty())
+        {
+            OBSDataAutoRelease settings = Utils::DataFromMap(settingsMap);
+            if (!requestedType.isEmpty() && requestedType != currentServiceType) {
+                OBSDataAutoRelease hotkeys = obs_hotkeys_save_service(service);
+                service = obs_service_create(requestedType.toUtf8(), STREAM_SERVICE_ID, settings, hotkeys);
+                obs_service_release(service);  // obs_service_create adds a ref which means you need
+                // remove here
+            } else {
+                // If type isn't changing, we should overlay the settings we got
+                // to the existing settings. The default obs_service_update does this
+                obs_service_update(service, settings);
+            }
+            obs_frontend_set_streaming_service(service);
+            
+            if (save)
+                obs_frontend_save_streaming_service();
+        }
     }
     
     if (save)
     {
         config->Save();
+        if (projectChanged)
+            obs_frontend_save();
     }
     
     if (reconnect)
     {
         qInfo() << "WAMP reg response indicated need to reconnect with alternative information. Reconnecting...";
 
-        _wampUrl = QString(); //to force reconnection
-        QMetaObject::invokeMethod(WSServer::Instance, "StartWamp",
-          Q_ARG(QUrl, config->WampUrl),
-          Q_ARG(QString, config->WampRealm),
-          Q_ARG(QString, config->WampBaseUri),
-          Q_ARG(QString, config->WampIdEnabled?config->WampId:""),
-          Q_ARG(QString, config->WampAuthEnabled?config->WampUser:""),
-          Q_ARG(QString, config->WampAuthEnabled?config->WampPassword:""));
+        this->_wampConnection->deleteLater();
+        this->_wampConnection = nullptr;
+        _wampUrl = QUrl(); //force reconnect
+        QTimer::singleShot(3000, [=](){ //wait three seconds to reconnect to not cause contention
+            QMetaObject::invokeMethod(WSServer::Instance, "StartWamp",
+              Q_ARG(QUrl, config->WampUrl),
+              Q_ARG(QString, config->WampRealm),
+              Q_ARG(QString, config->WampBaseUri),
+              Q_ARG(QString, config->WampIdEnabled?config->WampId:""),
+              Q_ARG(QString, config->WampAuthEnabled?config->WampUser:""),
+              Q_ARG(QString, config->WampAuthEnabled?config->WampPassword:""));
+        });
     }
     else if (canRegister)
     {
-        QMetaObject::invokeMethod(this, "RegisterWampProcedures", Qt::QueuedConnection);
+        QMetaObject::invokeMethod(this, "RegisterWampProcedures");
     }
+    else
+    {
+        QMetaObject::invokeMethod(this, "BroadcastWampConnected");
+    }
+}
+
+void WSServer::BroadcastWampConnected()
+{
+    OBSDataAutoRelease data = obs_data_create();
+    obs_data_set_string(data, "url", _wampUrl.toString().toUtf8());
+    obs_data_set_string(data, "realm", _wampRealm.toUtf8());
+    obs_data_set_string(data, "id", _wampId.toUtf8());
+    Broadcast("WampConnected", data);
 }
 
 void WSServer::RegisterWampProcedures()
@@ -472,6 +633,8 @@ void WSServer::RegisterWampProcedures()
             return handler.processIncomingMessage(args);
         });
     }
+    
+    QMetaObject::invokeMethod(this, "BroadcastWampConnected");
 }
 
 WSServer::WampConnectionStatus WSServer::GetWampStatus()
