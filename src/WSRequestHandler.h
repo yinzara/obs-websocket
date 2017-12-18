@@ -50,7 +50,7 @@ class WSRequestHandler : public QObject {
     virtual void setAuthenticated(bool authenticated) = 0;
 	
 	static QHash<QString, void(*)(WSRequestHandler*)> messageMap;
-	
+
   protected:
 	OBSDataAutoRelease data;
 	static QMutex _requestMutex;
@@ -115,6 +115,9 @@ class WSRequestHandler : public QObject {
     static void HandleSetCurrentProfile(WSRequestHandler* req);
     static void HandleGetCurrentProfile(WSRequestHandler* req);
     static void HandleListProfiles(WSRequestHandler* req);
+    
+    static void HandleGetWebSocketSettings(WSRequestHandler* req);
+    static void HandleSetWebSocketSettings(WSRequestHandler* req);
 
     static void HandleSetStreamSettings(WSRequestHandler* req);
     static void HandleGetStreamSettings(WSRequestHandler* req);
@@ -154,7 +157,8 @@ class WSWebSocketRequestHandler : WSRequestHandler {
     void SendErrorResponse(const char* errorMessage, obs_data_t* additionalFields = NULL) override;
     bool isAuthenticated() override;
     void setAuthenticated(bool auth) override;
-	
+    
+
   private:
     QWebSocket* _client;
 

@@ -23,6 +23,7 @@
 #include "Utils.h"
 
 #include "WSRequestHandler.h"
+#include "WSServer.h"
 
 QHash<QString, void(*)(WSRequestHandler*)> WSRequestHandler::messageMap {
     { "GetVersion", WSRequestHandler::HandleGetVersion },
@@ -86,6 +87,9 @@ QHash<QString, void(*)(WSRequestHandler*)> WSRequestHandler::messageMap {
     { "SetCurrentProfile", WSRequestHandler::HandleSetCurrentProfile },
     { "GetCurrentProfile", WSRequestHandler::HandleGetCurrentProfile },
     { "ListProfiles", WSRequestHandler::HandleListProfiles },
+
+    { "SetWebSocketSettings", WSRequestHandler::HandleSetWebSocketSettings },
+    { "GetWebSocketSettings", WSRequestHandler::HandleGetWebSocketSettings },
 
     { "SetStreamSettings", WSRequestHandler::HandleSetStreamSettings },
     { "GetStreamSettings", WSRequestHandler::HandleGetStreamSettings },
