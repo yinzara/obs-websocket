@@ -50,7 +50,8 @@ set(obs-websocket_SOURCES
 	src/WSRequestHandler_Streaming.cpp
 	src/WSRequestHandler_StudioMode.cpp
 	src/WSRequestHandler_Transitions.cpp
-	src/WSRequestHandler_Wamp.cpp
+	src/WSRequestHandler_WebSockets.cpp
+    src/WSRequestHandler_Wamp.cpp
 	src/WSEvents.cpp
 	src/Config.cpp
 	src/Utils.cpp

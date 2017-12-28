@@ -65,7 +65,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 Config* Config::_instance = nullptr;
 
-Config::Config(QObject * parent) : QObject(parent),
+Config::Config() : QObject(),
     ServerEnabled(true),
     ServerPort(4444),
     DebugEnabled(false),
@@ -104,32 +104,32 @@ Config::Config(QObject * parent) : QObject(parent),
         config_set_default_bool(obsConfig,
             SECTION_NAME, PARAM_AUTHREQUIRED, AuthRequired);
         config_set_default_string(obsConfig,
-            SECTION_NAME, PARAM_SECRET, qstring_data_copy(Secret));
+            SECTION_NAME, PARAM_SECRET, Secret.toUtf8());
         config_set_default_string(obsConfig,
-            SECTION_NAME, PARAM_SALT, qstring_data_copy(Salt));
+            SECTION_NAME, PARAM_SALT, Salt.toUtf8());
         
         config_set_default_bool(obsConfig,
             WAMP_SECTION_NAME, PARAM_WAMP_ENABLED, WampEnabled);
         config_set_default_bool(obsConfig,
             WAMP_SECTION_NAME, PARAM_WAMP_ALERT, WampAlertsEnabled);
         config_set_default_string(obsConfig,
-            WAMP_SECTION_NAME, PARAM_WAMP_URL, qstring_data_copy(WampUrl.toString()));
+            WAMP_SECTION_NAME, PARAM_WAMP_URL, WampUrl.toString().toUtf8());
         config_set_default_string(obsConfig,
-            WAMP_SECTION_NAME, PARAM_WAMP_ID, qstring_data_copy(WampId));
+            WAMP_SECTION_NAME, PARAM_WAMP_ID, WampId.toUtf8());
         config_set_default_string(obsConfig,
-            WAMP_SECTION_NAME, PARAM_WAMP_BASE_URI, qstring_data_copy(WampBaseUri));
+            WAMP_SECTION_NAME, PARAM_WAMP_BASE_URI, WampBaseUri.toUtf8());
         config_set_default_bool(obsConfig,
             WAMP_SECTION_NAME, PARAM_WAMP_ID_ENABLED, WampIdEnabled);
         config_set_default_string(obsConfig,
-            WAMP_SECTION_NAME, PARAM_WAMP_USER, qstring_data_copy(WampUser));
+            WAMP_SECTION_NAME, PARAM_WAMP_USER, WampUser.toUtf8());
         config_set_default_string(obsConfig,
-            WAMP_SECTION_NAME, PARAM_WAMP_PASSWORD, qstring_data_copy(WampPassword));
+            WAMP_SECTION_NAME, PARAM_WAMP_PASSWORD, WampPassword.toUtf8());
         config_set_default_bool(obsConfig,
             WAMP_SECTION_NAME, PARAM_WAMP_AUTH_ENABLED, WampAuthEnabled);
         config_set_default_bool(obsConfig,
             WAMP_SECTION_NAME, PARAM_WAMP_ANON_FALLBACK, WampAnonymousFallback);
         config_set_default_string(obsConfig,
-            WAMP_SECTION_NAME, PARAM_WAMP_REG_PROC, qstring_data_copy(WampRegisterProcedure));
+            WAMP_SECTION_NAME, PARAM_WAMP_REG_PROC, WampRegisterProcedure.toUtf8());
     }
 
     mbedtls_entropy_init(&entropy);
@@ -199,32 +199,23 @@ void Config::Save() {
     config_set_bool(obsConfig, SECTION_NAME, PARAM_ALERT, AlertsEnabled);
 
     config_set_bool(obsConfig, SECTION_NAME, PARAM_AUTHREQUIRED, AuthRequired);
-    config_set_string(obsConfig, SECTION_NAME, PARAM_SECRET,
-        qstring_data_copy(Secret));
-    config_set_string(obsConfig, SECTION_NAME, PARAM_SALT,
-        qstring_data_copy(Salt));
+    config_set_string(obsConfig, SECTION_NAME, PARAM_SECRET, Secret.toUtf8());
+    config_set_string(obsConfig, SECTION_NAME, PARAM_SALT, Salt.toUtf8());
 
     config_set_bool(obsConfig, WAMP_SECTION_NAME, PARAM_WAMP_ENABLED, WampEnabled);
     config_set_bool(obsConfig, WAMP_SECTION_NAME, PARAM_WAMP_ALERT, WampAlertsEnabled);
-    config_set_string(obsConfig, WAMP_SECTION_NAME, PARAM_WAMP_URL,
-        qstring_data_copy(WampUrl.toString()));
-    config_set_string(obsConfig, WAMP_SECTION_NAME, PARAM_WAMP_REALM,
-        qstring_data_copy(WampRealm));
-    config_set_string(obsConfig, WAMP_SECTION_NAME, PARAM_WAMP_ID,
-        qstring_data_copy(WampId));
-    config_set_string(obsConfig, WAMP_SECTION_NAME, PARAM_WAMP_BASE_URI,
-        qstring_data_copy(WampBaseUri));
+    config_set_string(obsConfig, WAMP_SECTION_NAME, PARAM_WAMP_URL, WampUrl.toString().toUtf8());
+    config_set_string(obsConfig, WAMP_SECTION_NAME, PARAM_WAMP_REALM, WampRealm.toUtf8());
+    config_set_string(obsConfig, WAMP_SECTION_NAME, PARAM_WAMP_ID, WampId.toUtf8());
+    config_set_string(obsConfig, WAMP_SECTION_NAME, PARAM_WAMP_BASE_URI, WampBaseUri.toUtf8());
     config_set_bool(obsConfig, WAMP_SECTION_NAME, PARAM_WAMP_ID_ENABLED, WampIdEnabled);
 
-    config_set_string(obsConfig, WAMP_SECTION_NAME, PARAM_WAMP_USER,
-        qstring_data_copy(WampUser));
-    config_set_string(obsConfig, WAMP_SECTION_NAME, PARAM_WAMP_PASSWORD,
-        qstring_data_copy(WampPassword));
+    config_set_string(obsConfig, WAMP_SECTION_NAME, PARAM_WAMP_USER, WampUser.toUtf8());
+    config_set_string(obsConfig, WAMP_SECTION_NAME, PARAM_WAMP_PASSWORD, WampPassword.toUtf8());
     config_set_bool(obsConfig, WAMP_SECTION_NAME, PARAM_WAMP_AUTH_ENABLED, WampAuthEnabled);
 
     config_set_bool(obsConfig, WAMP_SECTION_NAME, PARAM_WAMP_ANON_FALLBACK, WampAnonymousFallback);
-    config_set_string(obsConfig, WAMP_SECTION_NAME, PARAM_WAMP_REG_PROC,
-        qstring_data_copy(WampRegisterProcedure));
+    config_set_string(obsConfig, WAMP_SECTION_NAME, PARAM_WAMP_REG_PROC, WampRegisterProcedure.toUtf8());
 	
     config_save(obsConfig);
 }
@@ -313,10 +304,10 @@ bool Config::CheckAuth(QString response) {
 
 QString Config::DefaultWampId()
 {
-    QString wampId = Utils::WampUrlFix(QProcessEnvironment::systemEnvironment().value(WAMP_ID_ENV_VARIABLE,
+    QString wampId = QProcessEnvironment::systemEnvironment().value(WAMP_ID_ENV_VARIABLE,
         QHostInfo::localHostName().indexOf('.') > 0 ? //if the hostname contains a period
             QHostInfo::localHostName().left(QHostInfo::localHostName().indexOf('.')) : //strip everything after the first .
-            QHostInfo::localHostName()));
+            QHostInfo::localHostName());
     qInfo() << "Wamp ID default resolved " << wampId;
     return wampId;
 }

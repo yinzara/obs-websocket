@@ -41,8 +41,6 @@ SettingsDialog::SettingsDialog(QWidget* parent) :
             this, &SettingsDialog::WampAuthCheckboxChanged);
     connect(ui->wampUrl, &QLineEdit::textChanged,
             this, &SettingsDialog::WampUrlChanged);
-    connect(ui->wampId, &QLineEdit::textChanged,
-            this, &SettingsDialog::WampIdChanged);
     connect(ui->wampBaseUri, &QLineEdit::textChanged,
             this, &SettingsDialog::WampBaseUriChanged);
     connect(ui->authRequired, &QCheckBox::stateChanged,
@@ -148,14 +146,9 @@ void SettingsDialog::FormAccepted() {
         WSServer::Instance->Stop();
 
     if (conf->WampEnabled)
-        WSServer::Instance->StartWamp(conf->WampUrl, conf->WampRealm, conf->WampIdEnabled?conf->WampId:QString(), conf->WampAuthEnabled?conf->WampUser:QString(), conf->WampAuthEnabled?conf->WampPassword:QString());
+        WSServer::Instance->StartWamp(conf->WampUrl, conf->WampRealm, conf->WampBaseUri, conf->WampIdEnabled?conf->WampId:QString(), conf->WampAuthEnabled?conf->WampUser:QString(), conf->WampAuthEnabled?conf->WampPassword:QString());
     else
         WSServer::Instance->StopWamp();
-}
-
-void SettingsDialog::WampIdChanged(QString wampId)
-{
-    ui->wampId->setText(Utils::WampUrlFix(wampId));
 }
 
 void SettingsDialog::WampBaseUriChanged(QString wampUri)
@@ -203,6 +196,7 @@ void SettingsDialog::WampCheckboxChanged()
         ui->wampRegProc->setEnabled(ui->wampIdEnabled->isChecked());
         ui->wampAuthEnabled->setEnabled(true);
         ui->wampAnonFB->setEnabled(true);
+        ui->wampBaseUri->setEnabled(true);
         ui->wampUser->setEnabled(ui->wampAuthEnabled->isChecked());
         ui->wampPassword->setEnabled(ui->wampAuthEnabled->isChecked());
     }
@@ -215,6 +209,7 @@ void SettingsDialog::WampCheckboxChanged()
         ui->wampRegProc->setEnabled(false);
         ui->wampAuthEnabled->setEnabled(false);
         ui->wampAnonFB->setEnabled(false);
+        ui->wampBaseUri->setEnabled(false);
         ui->wampUser->setEnabled(false);
         ui->wampPassword->setEnabled(false);
     }

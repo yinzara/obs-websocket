@@ -13,6 +13,8 @@ const char* wampStatusToString(WSServer::WampConnectionStatus status) {
             return "CONNECTING";
         case WSServer::Disconnected:
             return "DISCONNECTED";
+        case WSServer::Disconnecting:
+            return "DISCONNETING";
         case WSServer::Error:
             return "ERROR";
     }
@@ -21,16 +23,17 @@ const char* wampStatusToString(WSServer::WampConnectionStatus status) {
 /**
  * Sets the current WAMP settings. Requires authentication.
  *
- * @return {String} `url` The WAMP web socket connection url.  Cannot be removed by setting to empty string.
- * @return {String} `realm` The WAMP realm.  Cannot be removed by setting to empty string.
- * @return {String} `id` The suffix added to all wamp procedure names and publish topics. Used to uniquely identify a given OBS Studio instance. Can be unspecified by setting to empty string.
- * @return {String} `baseuri` The prefix added to all wamp procedure names and publish topics. Generalled used for WAMP path based authentication. Cannot be removed by setting to empty string.
- * @return {bool} `alerts-enabled` Are desktop tray alerts shown on wamp connection events?
- * @return {bool} `auth-enabled` Should authentication be used when connecting to the WAMP server.
- * @return {bool} `anonymous-fallback` If authentication fails, should an unauthenticated connection be attempted.
- * @return {String} `user` The username for authentication. Can be unspecified by setting to empty string.
- * @return {String} `password` The password (i.e.secret) used for authentication. Can be unspecified by setting to empty string.
- * @return {String} `register-procedure` If specified, this procedure is called after the WAMP connection that allows the WAMP server to update the same configuration parameters as available here before the OBS proedures are registered. Can be unspecified by setting to empty string.
+ * @param {bool} `enabled` Is WAMP enabled?
+ * @param {String} `url` The WAMP web socket connection url.  Cannot be removed by setting to empty string.
+ * @param {String} `realm` The WAMP realm.  Cannot be removed by setting to empty string.
+ * @param {String} `id` The suffix added to all wamp procedure names and publish topics. Used to uniquely identify a given OBS Studio instance. Can be unspecified by setting to empty string.
+ * @param {String} `baseuri` The prefix added to all wamp procedure names and publish topics. Generalled used for WAMP path based authentication. Cannot be removed by setting to empty string.
+ * @param {bool} `alerts-enabled` Are desktop tray alerts shown on wamp connection events?
+ * @param {bool} `auth-enabled` Should authentication be used when connecting to the WAMP server.
+ * @param {bool} `anonymous-fallback` If authentication fails, should an unauthenticated connection be attempted.
+ * @param {String} `user` The username for authentication. Can be unspecified by setting to empty string.
+ * @param {String} `password` The password (i.e.secret) used for authentication. Can be unspecified by setting to empty string.
+ * @param {String} `register-procedure` If specified, this procedure is called after the WAMP connection that allows the WAMP server to update the same configuration parameters as available here before the OBS proedures are registered. Can be unspecified by setting to empty string.
  *
  * @api requests
  * @name SetWampSettings
@@ -42,6 +45,7 @@ void WSRequestHandler::HandleSetWampSettings(WSRequestHandler* req) {
     
     OBSDataAutoRelease response = obs_data_create();
     
+    bool enabled = req->hasField("enabled") ? obs_data_get_bool(req->data, "enabled") : config->WampEnabled;
     QString url = obs_data_get_string(req->data, "url");
     QString realm = obs_data_get_string(req->data, "realm");
     QString wampId = obs_data_get_string(req->data, "id");
@@ -53,6 +57,8 @@ void WSRequestHandler::HandleSetWampSettings(WSRequestHandler* req) {
     QString password = obs_data_get_string(req->data, "password");
     QString registerProcedure = obs_data_get_string(req->data, "register-procedure");
     
+    
+    config->WampEnabled = enabled;
     
     if (!url.isEmpty())  //required
         config->WampUrl = QUrl(url);
@@ -85,8 +91,8 @@ void WSRequestHandler::HandleSetWampSettings(WSRequestHandler* req) {
     }
     if (req->hasField("password")) //optional so can be set to empty string
     {
-        authEnabled = true;
-        config->WampAuthEnabled = true;
+        authEnabled = !password.isEmpty();
+        config->WampAuthEnabled = authEnabled;
         config->WampPassword = password;
     }
     
@@ -108,7 +114,8 @@ void WSRequestHandler::HandleSetWampSettings(WSRequestHandler* req) {
     
     if (reconnect || !config->WampEnabled)
     {
-        QMetaObject::invokeMethod(WSServer::Instance, "StopWamp");
+        qInfo() << "'UpdateWampSettings' request indicated Wamp should reconnect.  Reconnecting..";
+        WSServer::Instance->StopWamp();
     }
     
     if (config->WampEnabled)
@@ -126,6 +133,7 @@ void WSRequestHandler::HandleSetWampSettings(WSRequestHandler* req) {
 /**
  * Gets the current WAMP settings.  Can be called unauthenticated but then only returns 'url', 'realm', and 'id'
  *
+ * @return {bool} `enabled` Is WAMP enabled?
  * @return {String} `url` The WAMP web socket connection url
  * @return {String} `realm` The WAMP realm
  * @return {String} `id` The suffix added to all wamp procedure names and publish topics. Used to uniquely identify a given OBS Studio instance. Can be unspecified if no suffix is added
@@ -147,6 +155,7 @@ void WSRequestHandler::HandleGetWampSettings(WSRequestHandler* req) {
     
     OBSDataAutoRelease response = obs_data_create();
     
+    obs_data_set_bool(response, "enabled", config->WampEnabled);
     obs_data_set_string(response, "url", config->WampUrl.toString().toUtf8());
     obs_data_set_string(response, "realm", config->WampRealm.toUtf8());
     if (config->WampIdEnabled)

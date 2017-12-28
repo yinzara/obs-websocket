@@ -21,7 +21,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QtCore/QByteArray>
 #include <QMainWindow>
 #include <QMessageBox>
+#include <QNetworkInterface>
+#include <QGuiApplication>
+#include <QScreen>
 #include <obs-frontend-api.h>
+#include <QDesktopWidget>
+#include <QApplication>
+#include <QtMath>
 
 #include "WSServer.h"
 #include "obs-websocket.h"
@@ -31,6 +37,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #define STREAM_SERVICE_ID "websocket_custom_service"
 
+#define WAMP_CONNECT_TIMEOUT 10000
 #define WAMP_FUNCTION_PREFIX ".f."
 #define WAMP_TOPIC_PREFIX ".t."
 
@@ -45,7 +52,9 @@ WSServer::WSServer(QObject* parent)
       _wsServer(Q_NULLPTR),
       _clients(),
       _clMutex(QMutex::Recursive),
-      _wampConnection(nullptr),
+      _reconnectTimer(nullptr),
+      _reconnectCount(1),
+      _wampConnection(new WampConnection(this)),
       _wampStatus(WampConnectionStatus::Disconnected),
       _wampUrl(QUrl()),
       _wampId(QString()),
@@ -60,11 +69,20 @@ WSServer::WSServer(QObject* parent)
         QStringLiteral("obs-websocket"),
         QWebSocketServer::NonSecureMode, this);
     
+    _wampConnection->subscribeMeta = false;
+    
+    connect(_wampConnection, &WampConnection::connected,
+            this, &WSServer::onWampConnected);
+    connect(_wampConnection, &WampConnection::disconnected,
+            this, &WSServer::onWampDisconnected);
+    connect(_wampConnection, &WampConnection::error,
+            this, &WSServer::onWampError);
 }
 
 WSServer::~WSServer() {
     Stop();
     StopWamp();
+    delete _wampConnection;
 }
 
 void WSServer::Start(quint16 port) {
@@ -120,26 +138,31 @@ void WSServer::StartWamp(QUrl url, QString realm, QString baseUri, QString id, Q
         }
         return;
     }
-    if (_wampConnection) {
-        disconnect(_wampConnection, &WampConnection::disconnected,
-            this, &WSServer::onWampDisconnected); //ignore the disconnected event for the other socket
-        disconnect(_wampConnection, &WampConnection::error,
-                   this, &WSServer::onWampError); //ignore the error event for the other socket
-        _wampConnection->deleteLater();
-    }
-    _wampConnection = new WampConnection(this);
+    
+    if (_wampStatus != WampConnectionStatus::Disconnecting && _wampStatus != WampConnectionStatus::Disconnected)
+        _wampConnection->disconnect();
+    
+    _wampStatus = WampConnectionStatus::Connecting;
     _wampConnection->setUrl(url);
     _wampConnection->setRealm(realm);
 
-    if (!user.isEmpty()) {
+    if (!user.isEmpty())
+    {
         _wampConnection->setUser(new WampCraUser(user, password));
     }
+    else
+    {
+        _wampConnection->setUser(nullptr);
+    }
+    
+    _reconnectCount = 1;
 
     _wampId = id;
     _wampBaseUri = baseUri;
     _wampRealm = realm;
     _wampUrl = url;
     _wampUser = user;
+    
 
     qInfo() << "WAMP Connecting:"
         << "\nurl: " << url
@@ -149,20 +172,32 @@ void WSServer::StartWamp(QUrl url, QString realm, QString baseUri, QString id, Q
         << "\npassword: " << password
         << "\nbaseuri: " << baseUri;
 
-    connect(_wampConnection, &WampConnection::connected,
-            this, &WSServer::onWampConnected);
-    connect(_wampConnection, &WampConnection::disconnected,
-            this, &WSServer::onWampDisconnected);
-    connect(_wampConnection, &WampConnection::error,
-            this, &WSServer::onWampError);
-
+    //set a reconnect timer for 10 seconds to start the reconnection process should the initial connect fail
+    if (_reconnectTimer)
+    {
+        _reconnectTimer->stop();
+        _reconnectTimer->deleteLater();
+    }
+    _reconnectTimer = new QTimer(this);
+    _reconnectTimer->setSingleShot(true);
+    _reconnectTimer->setInterval(WAMP_CONNECT_TIMEOUT); // 10 second connect timeout
+    _reconnectTimer->setTimerType(Qt::TimerType::CoarseTimer);
+    connect(_reconnectTimer, &QTimer::timeout,
+            this, &WSServer::onWampConnectTimeout);
+    _reconnectTimer->start();
+    
     _wampConnection->connect();
+    
 }
 
 void WSServer::StopWamp()
 {
-    _wampConnection->deleteLater();
-    _wampConnection = nullptr;
+    _wampStatus = WampConnectionStatus::Disconnecting;
+    _wampConnection->disconnect();
+    _wampConnection->setUser(nullptr);
+    
+    cancelWampReconnect();
+    
     _wampId = QString();
     _wampRealm = QString();
     _wampUrl = QUrl();
@@ -172,6 +207,8 @@ void WSServer::StopWamp()
 
 void WSServer::onWampConnected()
 {
+    _reconnectCount = 1;
+    cancelWampReconnect();
     _wampStatus = WampConnectionStatus::Connected;
     
     qInfo() << "wamp " << _wampUrl << " connected";
@@ -185,14 +222,15 @@ void WSServer::onWampConnected()
     
     Utils::WampSysTrayNotify(msg, QSystemTrayIcon::Information, title);
 
-    RegisterWamp();
+    QMetaObject::invokeMethod(this, "RegisterWamp");
 }
 
 void WSServer::onWampDisconnected()
 {
-    
-    
     _wampStatus = WampConnectionStatus::Disconnected;
+    
+    disconnect(_wampConnection, &WampConnection::disconnected,
+               this, &WSServer::onWampDisconnected);
     
     qInfo() << "wamp " << _wampUrl << " disconnected";
     
@@ -204,13 +242,15 @@ void WSServer::onWampDisconnected()
     obs_frontend_pop_ui_translation();
     
     Utils::WampSysTrayNotify(msg, QSystemTrayIcon::Information, title);
+    
+    scheduleWampReconnect();
 }
 
 void WSServer::onWampError(const WampError& error)
 {
+    if (_wampStatus == WampConnectionStatus::Disconnecting || _wampStatus == WampConnectionStatus::Error)
+        return; //ignore errors while disconnecting or if already in an error state
     
-    if (_wampStatus != WampConnectionStatus::Connected)
-        _wampStatus = WampConnectionStatus::Error;
     _wampErrorUri = error.uri().toString();
         
     QVariantList args = error.args();
@@ -233,25 +273,30 @@ void WSServer::onWampError(const WampError& error)
     if ((_wampStatus == WampConnectionStatus::Connecting || _wampStatus == WampConnectionStatus::Disconnected) && !_wampUrl.isEmpty() && Config::Current()->WampAnonymousFallback && !_wampConnection->user()->name().isEmpty()) {
         qInfo() << "Connection error while connecting. Attempting anonymous fallback";
         
-        this->_wampConnection->deleteLater();
-        this->_wampConnection = nullptr;
         QUrl url = _wampUrl;
-        _wampUrl = QUrl(); //reset before
-        QTimer::singleShot(3000, [=](){
-            QMetaObject::invokeMethod(this, "StartWamp", Qt::QueuedConnection,
-                                      Q_ARG(QUrl, url),
-                                      Q_ARG(QString, _wampRealm),
-                                      Q_ARG(QString, _wampBaseUri),
-                                      Q_ARG(QString, _wampId));
-        });
+        QString realm = _wampRealm;
+        QString baseuri = _wampBaseUri;
+        QString wampid = _wampId;
+        
+        StopWamp();
+        QMetaObject::invokeMethod(this, "StartWamp", Qt::QueuedConnection,
+                                  Q_ARG(QUrl, url),
+                                  Q_ARG(QString, realm),
+                                  Q_ARG(QString, baseuri),
+                                  Q_ARG(QString, wampid));
         
         return;
     }
+    if (_wampStatus != WampConnectionStatus::Connected)
+        _wampStatus = WampConnectionStatus::Error;
     
     blog(LOG_INFO, "wamp %s error %s (%s)",
          _wampUrl.toString().toUtf8().constData(),
          _wampErrorMessage.toUtf8().constData(),
          _wampErrorUri.toUtf8().constData());
+    
+    cancelWampReconnect();
+    scheduleWampReconnect();
     
     obs_frontend_push_ui_translation(obs_module_get_string);
     QString title = tr("OBSWebsocket.WampNotifyError.Title");
@@ -265,11 +310,74 @@ void WSServer::onWampError(const WampError& error)
     Utils::WampSysTrayNotify(msg, QSystemTrayIcon::Information, title);
 }
 
+void WSServer::onWampConnectTimeout()
+{
+    cancelWampReconnect();
+    qDebug() << "wamp connection timeout. try again";
+    
+    scheduleWampReconnect();
+}
+
+void WSServer::onWampReconnectTimeout()
+{
+    StopWamp();
+    qDebug() << "wamp reconnect timeout occurred, reconnnecting...";
+    
+    Config* config = Config::Current();
+    if (config->WampEnabled)
+        QMetaObject::invokeMethod(this, "StartWamp",
+                              Q_ARG(QUrl, config->WampUrl),
+                              Q_ARG(QString, config->WampRealm),
+                              Q_ARG(QString, config->WampBaseUri),
+                              Q_ARG(QString, config->WampIdEnabled?config->WampId:""),
+                              Q_ARG(QString, config->WampAuthEnabled?config->WampUser:""),
+                              Q_ARG(QString, config->WampAuthEnabled?config->WampPassword:""));
+}
+
+void WSServer::cancelWampReconnect()
+{
+    if (_reconnectTimer != Q_NULLPTR)
+    {
+        qDebug() << "cancelling wamp reconnect";
+        disconnect(_reconnectTimer, &QTimer::timeout,
+                   this, &WSServer::onWampConnectTimeout);
+        
+        disconnect(_reconnectTimer, &QTimer::timeout,
+                   this, &WSServer::onWampReconnectTimeout);
+        
+        _reconnectTimer->stop();
+        
+        _reconnectTimer->deleteLater();
+        _reconnectTimer = Q_NULLPTR;
+    }
+}
+
+void WSServer::scheduleWampReconnect()
+{
+    if (_reconnectTimer == Q_NULLPTR)
+    {
+        int interval = qrand() % ((int)(qPow(2.0, _reconnectCount) - 1.0) * 1000);
+        qDebug() << "scheduling wamp reconnect with _reconnectCount : " << _reconnectCount << " and interval : " << interval;
+        _reconnectTimer = new QTimer(this);
+        _reconnectTimer->setSingleShot(true);
+        _reconnectTimer->setInterval(interval); // exponential backoff [generate pseudorandom number between 0 and (2^k-1)*1000 milliseconds] where k is the number of reconnection attepts
+        _reconnectTimer->setTimerType(Qt::TimerType::CoarseTimer);
+        connect(_reconnectTimer, &QTimer::timeout,
+                this, &WSServer::onWampReconnectTimeout);
+        _reconnectTimer->start();
+        
+        if (_reconnectCount < 5) //only go to a max of 5 so that the reconnect interval never goes above 30 seconds (i.e. 2^5-1=31)
+            _reconnectCount++;
+    }
+    else
+        qDebug() << "not scheduling reconnect as timer is already in place";
+}
+
 QString WSServer::WampTopic(QString value)
 {
     QString topic = Utils::WampUrlFix(value).prepend(WAMP_TOPIC_PREFIX).prepend(_wampBaseUri);
     if (!_wampId.isEmpty())
-        topic = topic.append('.').append(_wampId);
+        topic = topic.append('.').append(Utils::WampUrlFix(_wampId));
     return topic;
 }
 
@@ -280,7 +388,7 @@ QString WSServer::WampProcedure(QString value)
         .prepend(_wampBaseUri);
     
     if (!_wampId.isEmpty())
-        topic = topic.append('.').append(_wampId);
+        topic = topic.append('.').append(Utils::WampUrlFix(_wampId));
     
     return topic;
 }
@@ -397,6 +505,73 @@ void WSServer::RegisterWamp()
         OBSDataAutoRelease settings = obs_service_get_settings(service);
         QVariantMap settingsMap = Utils::MapFromData(settings);
         
+        QVariantList nics;
+        for (QNetworkInterface interf : QNetworkInterface::allInterfaces())
+        {
+            QVariantMap ifData;
+            ifData["name"] = interf.name();
+            if (interf.name() != interf.humanReadableName())
+                ifData["t"] = interf.humanReadableName();
+            ifData["index"] = interf.index();
+            
+            if (! interf.hardwareAddress().isEmpty())
+                ifData["mac"] = interf.hardwareAddress();
+            
+            for (QNetworkAddressEntry addr : interf.addressEntries())
+            {
+                if (!addr.ip().isLoopback()) // loopbacks
+                {
+                    QString ip = addr.ip().toString();
+                    if (ip.contains(':'))
+                        ifData["ip6"] = ip;
+                    else
+                    {
+                        ifData["ip"] = ip;
+                        if (!addr.netmask().toString().isEmpty())
+                            ifData["netmask"] = addr.netmask().toString();
+                        if (!addr.broadcast().toString().isEmpty())
+                            ifData["broadcast"] = addr.broadcast().toString();
+                    }
+                }
+            }
+            nics.append(ifData);
+        }
+        
+        QVariantList screens;
+        int i = 0;
+        QDesktopWidget* desktop = QApplication::desktop();
+        desktop->screen();
+        for (QScreen* screen : QGuiApplication::screens())
+        {
+            QVariantMap screenData;
+            screenData["index"] = i++;
+            if (screen->isPortrait(screen->orientation()))
+                screenData["orientation"] = "P";
+            else
+                screenData["orientation"] = "L";
+            if (screen->refreshRate() > 0)
+                screenData["refresh"] = screen->refreshRate();
+            if (!screen->serialNumber().isEmpty())
+                screenData["serial"] = screen->serialNumber();
+            if (!screen->name().isEmpty())
+                screenData["name"] = screen->name();
+            if (!screen->model().isEmpty())
+                screenData["model"] = screen->model();
+            if (!screen->manufacturer().isEmpty())
+                screenData["manufacturer"] = screen->manufacturer();
+            
+            QRect geom = screen->geometry();
+            if (geom.x() > 0)
+                screenData["x"] = geom.x();
+            if (geom.y() > 0)
+                screenData["y"] = geom.y();
+            screenData["width"] = geom.width();
+            screenData["height"] = geom.height();
+            
+            screens.append(screenData);
+        }
+            
+        
         QVariantMap stream {
             { "type" , serviceType },
             { "settings", settingsMap }
@@ -407,6 +582,8 @@ void WSServer::RegisterWamp()
             { "url", _wampUrl },
             { "realm", _wampRealm },
             { "baseuri", _wampBaseUri },
+            { "nics", nics },
+            { "screens", screens },
             { "scene-collection", sceneCollection },
             { "scene-name", sceneName },
             { "profile", profile },
@@ -432,10 +609,14 @@ void WSServer::RegisterWamp()
 void WSServer::CompleteWampRegistration(QVariant v)
 {
     Config* config = Config::Current();
-    QString currentSceneCollection = obs_frontend_get_current_scene_collection();
+    char* sc = obs_frontend_get_current_scene_collection();
+    QString currentSceneCollection = sc;
+    bfree(sc);
     OBSSourceAutoRelease scene = obs_frontend_get_current_scene();
     QString currentSceneName = obs_source_get_name(scene);
-    QString currentProfile = obs_frontend_get_current_profile();
+    char* prof = obs_frontend_get_current_profile();
+    QString currentProfile = prof;
+    bfree(prof);
     bool currentlyStreaming = obs_frontend_streaming_active();
     bool currentlyRecording = obs_frontend_recording_active();
     
@@ -589,24 +770,20 @@ void WSServer::CompleteWampRegistration(QVariant v)
     {
         qInfo() << "WAMP reg response indicated need to reconnect with alternative information. Reconnecting...";
 
-        this->_wampConnection->deleteLater();
-        this->_wampConnection = nullptr;
-        _wampUrl = QUrl(); //force reconnect
-        QTimer::singleShot(3000, [=](){ //wait three seconds to reconnect to not cause contention
-            QMetaObject::invokeMethod(WSServer::Instance, "StartWamp",
-              Q_ARG(QUrl, config->WampUrl),
-              Q_ARG(QString, config->WampRealm),
-              Q_ARG(QString, config->WampBaseUri),
-              Q_ARG(QString, config->WampIdEnabled?config->WampId:""),
-              Q_ARG(QString, config->WampAuthEnabled?config->WampUser:""),
-              Q_ARG(QString, config->WampAuthEnabled?config->WampPassword:""));
-        });
+        StopWamp();
+        QMetaObject::invokeMethod(this, "StartWamp",
+          Q_ARG(QUrl, config->WampUrl),
+          Q_ARG(QString, config->WampRealm),
+          Q_ARG(QString, config->WampBaseUri),
+          Q_ARG(QString, config->WampIdEnabled?config->WampId:""),
+          Q_ARG(QString, config->WampAuthEnabled?config->WampUser:""),
+          Q_ARG(QString, config->WampAuthEnabled?config->WampPassword:""));
     }
     else if (canRegister)
     {
         QMetaObject::invokeMethod(this, "RegisterWampProcedures");
     }
-    else
+    else if (_canPublish)
     {
         QMetaObject::invokeMethod(this, "BroadcastWampConnected");
     }
@@ -617,7 +794,7 @@ void WSServer::BroadcastWampConnected()
     OBSDataAutoRelease data = obs_data_create();
     obs_data_set_string(data, "url", _wampUrl.toString().toUtf8());
     obs_data_set_string(data, "realm", _wampRealm.toUtf8());
-    obs_data_set_string(data, "id", _wampId.toUtf8());
+    obs_data_set_string(data, "id", Utils::WampUrlFix(_wampId).toUtf8());
     Broadcast("WampConnected", data);
 }
 
@@ -628,13 +805,16 @@ void WSServer::RegisterWampProcedures()
     for (QHash<QString,void(*)(WSRequestHandler*)>::iterator i = WSRequestHandler::messageMap.begin();i != WSRequestHandler::messageMap.end();i++) {
         QString procedure = WampProcedure(i.key());
         void(*handlerMethod)(WSRequestHandler*) = i.value();
-        _wampConnection->registerProcedure(procedure, [handlerMethod, this](QVariantList args) {
+        _wampConnection->registerProcedure(procedure, [procedure, handlerMethod] (QVariantList args) {
+            if (Config::Current()->DebugEnabled)
+                qDebug() << "Call procedure " << procedure << " with args: " << args;
             WSWampRequestHandler handler(handlerMethod);
             return handler.processIncomingMessage(args);
         });
     }
     
-    QMetaObject::invokeMethod(this, "BroadcastWampConnected");
+    if (_canPublish)
+        QMetaObject::invokeMethod(this, "BroadcastWampConnected");
 }
 
 WSServer::WampConnectionStatus WSServer::GetWampStatus()

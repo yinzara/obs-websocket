@@ -21,6 +21,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <QObject>
 #include <QList>
+#include <QTimer>
 #include <QMutex>
 
 #include <wampconnection.h>
@@ -37,7 +38,8 @@ class WSServer : public QObject {
         Disconnected = 0,
         Connecting = 1,
         Connected = 2,
-        Error = 3
+        Disconnecting = 3,
+        Error = 4
     };
 
     explicit WSServer(QObject* parent = Q_NULLPTR);
@@ -52,7 +54,7 @@ class WSServer : public QObject {
     QString GetWampErrorMessage();
     QString GetWampErrorUri();
     OBSDataAutoRelease GetWampErrorData();
-
+    
     static WSServer* Instance;
 	
   public slots:
@@ -71,16 +73,22 @@ class WSServer : public QObject {
     void onWampConnected();
     void onWampDisconnected();
     void onWampError(const WampError& error);
+    void onWampConnectTimeout();
+    void onWampReconnectTimeout();
 
   private:
 	
 
     QString WampTopic(QString value);
     QString WampProcedure(QString value);
-
+    void scheduleWampReconnect();
+    void cancelWampReconnect();
+    
     QWebSocketServer* _wsServer;
     QList<QWebSocket*> _clients;
     QMutex _clMutex;
+    QTimer* _reconnectTimer;
+    int _reconnectCount;
     WampConnection* _wampConnection;
     WampConnectionStatus _wampStatus;
     QUrl _wampUrl;

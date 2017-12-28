@@ -32,10 +32,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 Q_DECLARE_METATYPE(OBSScene);
 
-const char* qstring_data_copy(QString value) {
-	return bstrdup(value.toUtf8().constData());
-}
-
 obs_data_array_t* Utils::StringListToArray(char** strings, const char* key) {
     if (!strings)
         return obs_data_array_create();
@@ -701,7 +697,7 @@ obs_data_t* Utils::DataFromMap(QVariantMap map)
 
 obs_data_t* Utils::DataFromList(QVariantList list)
 {
-    OBSDataAutoRelease data = obs_data_create();
+    obs_data_t* data = obs_data_create();
     int count = list.count();
     if (count == 1)
     {
@@ -737,8 +733,8 @@ obs_data_t* Utils::DataFromList(QVariantList list)
 
 QString Utils::WampUrlFix(QString str) {
     return str
-    .toLower()
-    .replace('-','_');
+    .toLower() //lowercase
+    .remove(QRegExp("[^a-z0-9\\_\\.]")); //remove any invalid characters from the string - valid are letters, numbers, underscore (_), and dot (.)
 }
 
 

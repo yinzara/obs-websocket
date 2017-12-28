@@ -57,26 +57,21 @@ bool obs_module_load(void) {
     blog(LOG_INFO, "qt version (compile-time): %s ; qt version (run-time): %s",
         QT_VERSION_STR, qVersion());
     // Core setup
-    Config* config = new Config(nullptr);
+    Config* config = new Config();
     Config::SetCurrent(config);
     config->Load();
 
-    WSServer::Instance = new WSServer(config);
+    WSServer::Instance = new WSServer();
     WSEvents::Instance = new WSEvents(WSServer::Instance);
 
-//    Wamp wamp;
-//    wamp.registerTypes("obs-websocket");
-//
-//    CorePlugin core;
-//    core.registerTypes("obs-websocket");
-//
-//    Websockets websockets;
-//    websockets.registerTypes("obs-websocket");
-    
-    qRegisterMetaType<WampInvocationPointer>("WampInvocationPointer");
-    qRegisterMetaType<Event>("Event");
-    qRegisterMetaType<WampError>("WampError");
-    QMetaType::registerConverter<WampError, QString>(&WampError::toString);
+    Wamp wamp;
+    wamp.registerTypes("obs-websocket");
+
+    CorePlugin core;
+    core.registerTypes("obs-websocket");
+
+    Websockets websockets;
+    websockets.registerTypes("obs-websocket");
     
     if (config->ServerEnabled)
     {
@@ -117,6 +112,7 @@ bool obs_module_load(void) {
 
 void obs_module_unload() {
     blog(LOG_INFO, "goodbye!");
-    Config::Current()->deleteLater();
+    delete WSServer::Instance;
+    delete Config::Current();
 }
 

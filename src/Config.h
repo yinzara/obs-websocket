@@ -29,7 +29,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 class Config : public QObject {
   public:
 	
-    explicit Config(QObject* parent);
+    Config();
     ~Config();
     void Load();
     void Save();

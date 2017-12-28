@@ -332,7 +332,9 @@ void WSEvents::OnSceneListChange() {
  */
 void WSEvents::OnSceneCollectionChange() {
     OBSDataAutoRelease data = obs_data_create();
-    obs_data_set_string(data, "sc-name", obs_frontend_get_current_scene_collection());
+    char * sc = obs_frontend_get_current_scene_collection();
+    obs_data_set_string(data, "sc-name", sc);
+    bfree(sc);
     
     broadcastUpdate("SceneCollectionChanged", data);
 
@@ -409,7 +411,9 @@ void WSEvents::OnTransitionListChange() {
  */
 void WSEvents::OnProfileChange() {
     OBSDataAutoRelease data = obs_data_create();
-    obs_data_set_string(data, "profile-name", obs_frontend_get_current_profile());
+    char* profile = obs_frontend_get_current_profile();
+    obs_data_set_string(data, "profile-name", profile);
+    bfree(profile);
     broadcastUpdate("ProfileChanged", data);
 }
 
@@ -460,7 +464,9 @@ void WSEvents::OnStreamStarting() {
 void WSEvents::OnStreamStarted() {
     _streamStarttime = os_gettime_ns();
     _lastBytesSent = 0;
-    broadcastUpdate("StreamStarted");
+    OBSDataAutoRelease data = obs_data_create();
+    obs_data_set_bool(data, "recording", obs_frontend_recording_active());
+    broadcastUpdate("StreamStarted", data);
 }
 
 /**
@@ -490,7 +496,9 @@ void WSEvents::OnStreamStopping() {
  */
 void WSEvents::OnStreamStopped() {
     _streamStarttime = 0;
-    broadcastUpdate("StreamStopped");
+    OBSDataAutoRelease data = obs_data_create();
+    obs_data_set_bool(data, "recording", obs_frontend_recording_active());
+    broadcastUpdate("StreamStopped", data);
 }
 
 /**
@@ -515,7 +523,9 @@ void WSEvents::OnRecordingStarting() {
  */
 void WSEvents::OnRecordingStarted() {
     _recStarttime = os_gettime_ns();
-    broadcastUpdate("RecordingStarted");
+    OBSDataAutoRelease data = obs_data_create();
+    obs_data_set_bool(data, "streaming", obs_frontend_streaming_active());
+    broadcastUpdate("RecordingStarted", data);
 }
 
 /**
@@ -527,7 +537,14 @@ void WSEvents::OnRecordingStarted() {
  * @since 0.3
  */
 void WSEvents::OnRecordingStopping() {
-    broadcastUpdate("RecordingStopping");
+    OBSDataAutoRelease data = obs_data_create();
+    
+    OBSOutputAutoRelease output = obs_frontend_get_recording_output();
+    OBSDataAutoRelease settings = obs_output_get_settings(output);
+    obs_data_set_string(data, "path", obs_data_get_string(settings, "path")); //the path to the recorded output file
+    obs_data_set_bool(data, "streaming", obs_frontend_streaming_active());
+    
+    broadcastUpdate("RecordingStopping", data);
 }
 
 /**
@@ -540,7 +557,14 @@ void WSEvents::OnRecordingStopping() {
  */
 void WSEvents::OnRecordingStopped() {
     _recStarttime = 0;
-    broadcastUpdate("RecordingStopped");
+    
+    OBSDataAutoRelease data = obs_data_create();
+    OBSOutputAutoRelease output = obs_frontend_get_recording_output();
+    OBSDataAutoRelease settings = obs_output_get_settings(output);
+    obs_data_set_string(data, "path", obs_data_get_string(settings, "path")); //the path to the recorded output file
+    obs_data_set_bool(data, "streaming", obs_frontend_streaming_active());
+    
+    broadcastUpdate("RecordingStopped", data);
 }
 
 /**
@@ -706,7 +730,9 @@ void WSEvents::Heartbeat() {
     pulse = !pulse;
     obs_data_set_bool(data, "pulse", pulse);
 
-    obs_data_set_string(data, "current-profile", obs_frontend_get_current_profile());
+    char* profile = obs_frontend_get_current_profile();
+    obs_data_set_string(data, "current-profile", profile);
+    bfree(profile);
 
     OBSSourceAutoRelease currentScene = obs_frontend_get_current_scene();
     obs_data_set_string(data, "current-scene", obs_source_get_name(currentScene));
