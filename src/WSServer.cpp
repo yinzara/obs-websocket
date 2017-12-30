@@ -296,6 +296,7 @@ void WSServer::onWampError(const WampError& error)
          _wampErrorUri.toUtf8().constData());
     
     cancelWampReconnect();
+    _reconnectCount = 1;
     scheduleWampReconnect();
     
     obs_frontend_push_ui_translation(obs_module_get_string);
