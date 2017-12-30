@@ -64,14 +64,10 @@ bool obs_module_load(void) {
     WSServer::Instance = new WSServer();
     WSEvents::Instance = new WSEvents(WSServer::Instance);
 
-    Wamp wamp;
-    wamp.registerTypes("obs-websocket");
-
-    CorePlugin core;
-    core.registerTypes("obs-websocket");
-
-    Websockets websockets;
-    websockets.registerTypes("obs-websocket");
+    qRegisterMetaType<WampInvocationPointer>("WampInvocationPointer");
+    qRegisterMetaType<Event>("Event");
+    qRegisterMetaType<WampError>("WampError");
+    QMetaType::registerConverter<WampError, QString>(&WampError::toString);
     
     if (config->ServerEnabled)
     {
