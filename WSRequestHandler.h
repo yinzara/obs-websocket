@@ -49,6 +49,7 @@ class WSRequestHandler : public QObject
 		static void HandleGetVersion(WSRequestHandler* req);
 		static void HandleGetAuthRequired(WSRequestHandler* req);
 		static void HandleAuthenticate(WSRequestHandler* req);
+		static void HandleRestart(WSRequestHandler* req);
 	
 		static void HandleGetWebSocketSettings(WSRequestHandler* req);
 		static void HandleSetWebSocketSettings(WSRequestHandler* req);

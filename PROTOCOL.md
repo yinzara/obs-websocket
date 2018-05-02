@@ -55,6 +55,7 @@ The protocol in general is based on the OBS Remote protocol created by Bill Hami
       - ["GetVersion"](#getversion)
       - ["GetAuthRequired"](#getauthrequired)
       - ["Authenticate"](#authenticate)
+      - ["Restart"](#restart)
     - **WebSocket Settings**
       - ["GetWebSocketSettings"](#getwebsocketsettings)
       - ["SetWebSocketSettings"](#setwebsocketsettings)
@@ -378,6 +379,17 @@ __Request fields__ :
 - **"auth"** (string) : response to the auth challenge (see "Authentication").
 
 __Response__ : OK if auth succeeded, error if invalid credentials. No additional fields.
+
+---
+
+#### "Restart"
+Restart OBS Studio. If currently streaming, starts streaming again after restart. If currently recording, starts recording again after restart.
+
+__Request fields__:
+- **"streaming"** (string) : Optional. Either 'stop' or 'start'.  Overrides current status and causes OBS to start/stop streaming after restart.
+- **"recording"** (string) : Optional. Either 'stop' or 'start'.  Overrides current status and causes OBS to start/stop recording after restart.
+- **"metadata"** (object) : Optional. If specified used as the metadata for the next stream OBS starts. (see StartStreaming and the 'metadata' parameter)
+--Response__ : OK if restart successful. Error if not authenticated. (see "Authentication")
 
 ---
 

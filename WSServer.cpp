@@ -254,7 +254,7 @@ void WSServer::onServerConnection()
 			_lastRemoteError = QString();
 		}
 		
-		blog(LOG_INFO, "server connection establed to %s",
+		blog(LOG_INFO, "server connection established to %s",
 			 _serverUrl.toString().toUtf8().constData());
 		
 		_reconnectCount = 1;
@@ -262,6 +262,8 @@ void WSServer::onServerConnection()
 		
 		connect(_serverConnection, &QWebSocket::textMessageReceived,
 			this, &WSServer::textMessageReceived);
+		connect(_serverConnection, &QWebSocket::pong,
+				this, &WSServer::onPong);
 		_serverConnection->setProperty(PROP_AUTHENTICATED, true); // server connections are automatically authenticated since they were outbound (i.e. we should trust it)
 		
 		obs_data_t* connectMsg = obs_data_create();
@@ -280,6 +282,15 @@ void WSServer::onServerConnection()
 
 		obs_data_release(connectMsg);
 		
+		cancelReconnect();
+		_reconnectTimer = new QTimer(this);
+		_reconnectTimer->setSingleShot(true);
+		_reconnectTimer->setInterval(CONNECT_TIMEOUT); // 10 second ping timeout
+		_reconnectTimer->setTimerType(Qt::TimerType::CoarseTimer);
+		connect(_reconnectTimer, &QTimer::timeout,
+				this, &WSServer::onPingTimeout);
+		_reconnectTimer->start();
+		
 		WSEvents::Instance->OnRemoteControlServerStateChange();
 	}
 }
@@ -287,6 +298,47 @@ void WSServer::onServerConnection()
 QString WSServer::GetRemoteControlServerError()
 {
 	return _lastRemoteError;
+}
+
+void WSServer::onPingTimeout()
+{
+	blog(LOG_DEBUG, "Ping!!!");
+	_serverConnection->ping();
+	
+	_reconnectTimer = new QTimer(this);
+	_reconnectTimer->setSingleShot(true);
+	_reconnectTimer->setInterval(CONNECT_TIMEOUT); // 10 second pong timeout
+	_reconnectTimer->setTimerType(Qt::TimerType::CoarseTimer);
+	connect(_reconnectTimer, &QTimer::timeout,
+			this, &WSServer::onPongTimeout);
+	_reconnectTimer->start();
+}
+
+void WSServer::onPongTimeout()
+{
+	cancelReconnect();
+	_lastRemoteError = "Pong not received for ping after 10 seconds. Reconnecting...";
+	blog(LOG_WARNING, "%s", _lastRemoteError.toUtf8().constData());
+	_currentStatus = WSRemoteControlServerStatus::ErrorState;
+	WSEvents::Instance->OnRemoteControlServerStateChange();
+	
+	scheduleServerReconnect();
+}
+
+void WSServer::onPong(quint64 elapsedTime, const QByteArray &payload)
+{
+	UNUSED_PARAMETER(payload);
+	
+	blog(LOG_DEBUG, "Pong!! Elapsted time %llu", elapsedTime);
+	cancelReconnect();
+	
+	_reconnectTimer = new QTimer(this);
+	_reconnectTimer->setSingleShot(true);
+	_reconnectTimer->setInterval(CONNECT_TIMEOUT); // 10 second ping timeout
+	_reconnectTimer->setTimerType(Qt::TimerType::CoarseTimer);
+	connect(_reconnectTimer, &QTimer::timeout,
+			this, &WSServer::onPingTimeout);
+	_reconnectTimer->start();
 }
 
 void WSServer::onServerError(QAbstractSocket::SocketError error)
@@ -301,6 +353,7 @@ void WSServer::onServerError(QAbstractSocket::SocketError error)
 		_currentStatus = WSRemoteControlServerStatus::ErrorState;
 		WSEvents::Instance->OnRemoteControlServerStateChange();
 	}
+	cancelReconnect();
 	scheduleServerReconnect();
 }
 
@@ -311,7 +364,7 @@ void WSServer::onServerConnectTimeout()
 	_currentStatus = WSRemoteControlServerStatus::ErrorState;
 	_lastRemoteError = QStringLiteral("Connection Timeout");
 	
-	
+
 	blog(LOG_INFO, "server connection timeout to %s",
 		 _serverUrl.toString().toUtf8().constData());
 	
@@ -382,6 +435,8 @@ void WSServer::onServerDisconnect()
 			//abnormal close, increment connection attempts to 5 so that retries are attempted at the max inteval
 			_reconnectCount = 5;
 		}
+		
+		blog(LOG_INFO, "server disconnected");
 		
 		_serverConnection->deleteLater();
 		_serverConnection = Q_NULLPTR;

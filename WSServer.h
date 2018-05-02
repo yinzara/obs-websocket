@@ -76,6 +76,9 @@ class WSServer : public QObject
 		void onReconnect();
 		void onServerConnectTimeout();
 		void cancelReconnect();
+		void onPingTimeout();
+		void onPongTimeout();
+		void onPong(quint64 elapsedTime, const QByteArray &payload);
 
 	private:
 		QWebSocketServer* _wsServer;

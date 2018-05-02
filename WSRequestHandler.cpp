@@ -26,6 +26,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QProcessEnvironment>
 #include <qstring.h>
 #include <QHostInfo>
+#include <QApplication>
+#include <QProcess>
 
 #define WS_HOSTNAME_ENV_VARIABLE QStringLiteral("WS_HOSTNAME")
 
@@ -38,6 +40,7 @@ QMap<QString, void(*)(WSRequestHandler*)> WSRequestHandler::messageMap {
 	{"GetVersion", WSRequestHandler::HandleGetVersion},
 	{"GetAuthRequired", WSRequestHandler::HandleGetAuthRequired},
 	{"Authenticate", WSRequestHandler::HandleAuthenticate},
+	{"Restart", WSRequestHandler::HandleRestart},
 	
 	{"GetWebSocketSettings", WSRequestHandler::HandleGetWebSocketSettings},
 	{"SetWebSocketSettings", WSRequestHandler::HandleSetWebSocketSettings},
@@ -115,6 +118,7 @@ QSet<QString> WSRequestHandler::authNotRequired {
 	"GetVersion",
 	"GetAuthRequired",
 	"Authenticate",
+	"Restart",
 	"GetRemoteControlServerStatus"
 };
 
@@ -278,6 +282,95 @@ void WSRequestHandler::HandleAuthenticate(WSRequestHandler* req)
 	{
 		req->SendErrorResponse("Authentication Failed.");
 	}
+}
+
+void WSRequestHandler::HandleRestart(WSRequestHandler* req)
+{
+	
+	bool startStreaming = obs_frontend_streaming_active();
+	const char* streaming = obs_data_get_string(req->data, "streaming");
+	if (streaming)
+	{
+		if (qstricmp(streaming, "start") == 0)
+		{
+			startStreaming = true;
+		}
+		else if (qstricmp(streaming, "stop") == 0)
+		{
+			startStreaming = false;
+		}
+	}
+	
+	bool startRecording = obs_frontend_recording_active();
+	const char* recording= obs_data_get_string(req->data, "recording");
+	if (recording)
+	{
+		if (qstricmp(recording, "start") == 0)
+		{
+			startRecording = true;
+		}
+		else if (qstricmp(recording, "stop") == 0)
+		{
+			startRecording = false;
+		}
+	}
+	
+	obs_data_t* metadata = obs_data_get_obj(req->data, "metadata");
+	if (metadata) {
+		QString query = Utils::ParseDataToQueryString(metadata);
+		//Supporting adding metadata parameters to key query string
+		if (!query.isEmpty())
+		{
+			obs_service_t* service = obs_frontend_get_streaming_service();
+			obs_data_t* settings = obs_service_get_settings(service);
+			const char* key = obs_service_get_key(service);
+			int keylen = strlen(key);
+			bool hasQuestionMark = false;
+			for (int i = 0; i < keylen; i++)
+			{
+				if (key[i] == '?')
+				{
+					hasQuestionMark = true;
+					break;
+				}
+			}
+			if (hasQuestionMark)
+			{
+				query.prepend('&');
+			}
+			else
+			{
+				query.prepend('?');
+			}
+			query.prepend(key);
+			obs_data_set_string(settings, "key", query.toUtf8());
+			obs_service_update(service, settings);
+			obs_data_release(settings);
+			obs_frontend_save_streaming_service();
+		}
+	}
+	obs_data_release(metadata);
+	
+	QStringList args = QStringList();
+	foreach (const QString &str, qApp->arguments())
+	{
+		if (qApp->arguments()[0] != str && str != "--startstreaming" && str != "--startrecording")
+		{
+			args << str;
+		}
+	}
+	
+	if (startStreaming)
+	{
+		args << "--startstreaming";
+	}
+	if (startRecording)
+	{
+		args << "--startrecording";
+	}
+	
+	qApp->quit();
+	QProcess::startDetached(qApp->arguments()[0], args);
 }
 
 void WSRequestHandler::HandleGetWebSocketSettings(WSRequestHandler *req)
