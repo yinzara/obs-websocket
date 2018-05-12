@@ -28,7 +28,7 @@
    </property>
    <item>
     <layout class="QFormLayout" name="formLayout">
-     <item row="1" column="1">
+     <item row="2" column="1">
       <widget class="QCheckBox" name="serverEnabled">
        <property name="text">
         <string>OBSWebsocket.Settings.ServerEnable</string>
@@ -38,14 +38,14 @@
        </property>
       </widget>
      </item>
-     <item row="2" column="0">
+     <item row="3" column="0">
       <widget class="QLabel" name="lbl_serverPort">
        <property name="text">
         <string>OBSWebsocket.Settings.ServerPort</string>
        </property>
       </widget>
      </item>
-     <item row="2" column="1">
+     <item row="3" column="1">
       <widget class="QSpinBox" name="serverPort">
        <property name="minimum">
         <number>1024</number>
@@ -58,28 +58,28 @@
        </property>
       </widget>
      </item>
-     <item row="3" column="1">
+     <item row="4" column="1">
       <widget class="QCheckBox" name="authRequired">
        <property name="text">
         <string>OBSWebsocket.Settings.AuthRequired</string>
        </property>
       </widget>
      </item>
-     <item row="4" column="0">
+     <item row="5" column="0">
       <widget class="QLabel" name="lbl_password">
        <property name="text">
         <string>OBSWebsocket.Settings.Password</string>
        </property>
       </widget>
      </item>
-     <item row="4" column="1">
+     <item row="5" column="1">
       <widget class="QLineEdit" name="password">
        <property name="echoMode">
         <enum>QLineEdit::Password</enum>
        </property>
       </widget>
      </item>
-     <item row="5" column="1">
+     <item row="6" column="1">
       <widget class="QCheckBox" name="debugEnabled">
        <property name="text">
         <string>OBSWebsocket.Settings.DebugEnable</string>
@@ -89,27 +89,44 @@
        </property>
       </widget>
      </item>
-     <item row="6" column="1">
+     <item row="7" column="1">
       <widget class="QCheckBox" name="remoteServerEnabled">
        <property name="text">
         <string>OBSWebsocket.Settings.RemoteServerEnable</string>
        </property>
       </widget>
      </item>
-     <item row="7" column="0">
+     <item row="8" column="0">
       <widget class="QLabel" name="label">
        <property name="text">
         <string>OBSWebsocket.Settings.ServerUrl</string>
        </property>
       </widget>
      </item>
-     <item row="7" column="1">
+     <item row="8" column="1">
       <widget class="QLineEdit" name="serverUrl">
        <property name="minimumSize">
         <size>
          <width>250</width>
          <height>0</height>
         </size>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="1">
+      <widget class="QLabel" name="version">
+       <property name="enabled">
+        <bool>true</bool>
+       </property>
+       <property name="text">
+        <string/>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="0">
+      <widget class="QLabel" name="versionlabel">
+       <property name="text">
+        <string>OBSWebsocket.Settings.VersionLabel</string>
        </property>
       </widget>
      </item>

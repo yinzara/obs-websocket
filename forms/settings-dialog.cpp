@@ -1,4 +1,4 @@
-/*
+﻿/*
 obs-websocket
 Copyright (C) 2016-2017	Stéphane Lepin <stephane.lepin@gmail.com>
 
@@ -61,7 +61,7 @@ void SettingsDialog::showEvent(QShowEvent* event)
 	ui->authRequired->setChecked(conf->AuthRequired);
 	ui->password->setText(CHANGE_ME);
 	ui->remoteServerEnabled->setChecked(conf->WSServerEnabled);
-	
+	ui->version->setText(OBS_WEBSOCKET_VERSION);
 	if (!conf->WSServerUrl.isEmpty())
 		ui->serverUrl->setText(conf->WSServerUrl.toString());
 	else
