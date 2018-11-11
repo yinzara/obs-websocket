@@ -1050,7 +1050,7 @@ void WSRequestHandler::HandleSetSceneItemPosition(WSRequestHandler* req)
 
 	if (scene_item)
 	{
-		vec2 item_position = { 0 };
+		vec2 item_position = {0};
 		item_position.x = obs_data_get_double(req->data, "x");
 		item_position.y = obs_data_get_double(req->data, "y");
 

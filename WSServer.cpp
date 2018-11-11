@@ -35,6 +35,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #define WS_HOSTNAME_ENV_VARIABLE QStringLiteral("WS_HOSTNAME")
 #define WS_ORIGIN_ENV_VARIABLE QStringLiteral("WS_ORIGIN")
 #define CONNECT_TIMEOUT 10000
+#define MAX_RECONNECT_COUNT 6
 
 QT_USE_NAMESPACE
 
@@ -302,16 +303,27 @@ QString WSServer::GetRemoteControlServerError()
 
 void WSServer::onPingTimeout()
 {
-	blog(LOG_DEBUG, "Ping!!!");
-	_serverConnection->ping();
-	
-	_reconnectTimer = new QTimer(this);
-	_reconnectTimer->setSingleShot(true);
-	_reconnectTimer->setInterval(CONNECT_TIMEOUT); // 10 second pong timeout
-	_reconnectTimer->setTimerType(Qt::TimerType::CoarseTimer);
-	connect(_reconnectTimer, &QTimer::timeout,
-			this, &WSServer::onPongTimeout);
-	_reconnectTimer->start();
+	if (_currentStatus != WSRemoteControlServerStatus::ConnectedState) {
+		cancelReconnect();
+		_lastRemoteError = "Ping was scheduled to be sent but the web socket was not connected.  Reconnecting...";
+		blog(LOG_WARNING, "%s", _lastRemoteError.toUtf8().constData());
+		_currentStatus = WSRemoteControlServerStatus::ErrorState;
+		WSEvents::Instance->OnRemoteControlServerStateChange();
+		scheduleServerReconnect();
+	} else {
+		if (Config::Instance->DebugEnabled)
+			blog(LOG_DEBUG, "Ping!!!");
+		
+		_serverConnection->ping();
+		
+		_reconnectTimer = new QTimer(this);
+		_reconnectTimer->setSingleShot(true);
+		_reconnectTimer->setInterval(CONNECT_TIMEOUT); // 10 second pong timeout
+		_reconnectTimer->setTimerType(Qt::TimerType::CoarseTimer);
+		connect(_reconnectTimer, &QTimer::timeout,
+				this, &WSServer::onPongTimeout);
+		_reconnectTimer->start();
+	}
 }
 
 void WSServer::onPongTimeout()
@@ -329,7 +341,8 @@ void WSServer::onPong(quint64 elapsedTime, const QByteArray &payload)
 {
 	UNUSED_PARAMETER(payload);
 	
-	blog(LOG_DEBUG, "Pong!! Elapsted time %llu", elapsedTime);
+	if (Config::Instance->DebugEnabled)
+		blog(LOG_DEBUG, "Pong!! Elapsted time %llu", elapsedTime);
 	cancelReconnect();
 	
 	_reconnectTimer = new QTimer(this);
@@ -383,7 +396,7 @@ void WSServer::scheduleServerReconnect()
 				this, &WSServer::onReconnect);
 		_reconnectTimer->start();
 		
-		if (_reconnectCount < 5) //only go to a max of 5 so that the reconnect interval never goes above 30 seconds (i.e. 2^5-1=31)
+		if (_reconnectCount < MAX_RECONNECT_COUNT) //only go to a max of 6 so that the reconnect interval never goes above 60 seconds (i.e. 2^5-1=63)
 			_reconnectCount++;
 	}
 }
@@ -433,8 +446,10 @@ void WSServer::onServerDisconnect()
 			if (_lastRemoteError.isEmpty())
 				_lastRemoteError = _serverConnection->closeReason();
 			//abnormal close, increment connection attempts to 5 so that retries are attempted at the max inteval
-			_reconnectCount = 5;
+			_reconnectCount = MAX_RECONNECT_COUNT;
 		}
+		
+		cancelReconnect();
 		
 		blog(LOG_INFO, "server disconnected");
 		
